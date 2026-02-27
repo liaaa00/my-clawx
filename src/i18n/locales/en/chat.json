@@ -14,7 +14,10 @@
         "newSession": "New session",
         "refresh": "Refresh chat",
         "showThinking": "Show thinking",
-        "hideThinking": "Hide thinking"
+        "hideThinking": "Hide thinking",
+        "modelSwitched": "Switched to {{model}}",
+        "loadingModels": "Loading models...",
+        "noModels": "No models"
     },
     "noResponseTimeout": "No response received from the model. The provider may be unavailable or the API key may have insufficient quota. Please check your provider settings.",
     "processingToolResults": "Processing tool results…"

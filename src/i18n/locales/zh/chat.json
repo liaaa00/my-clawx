@@ -14,7 +14,10 @@
         "newSession": "新会话",
         "refresh": "刷新聊天",
         "showThinking": "显示思考过程",
-        "hideThinking": "隐藏思考过程"
+        "hideThinking": "隐藏思考过程",
+        "modelSwitched": "已切换到 {{model}}",
+        "loadingModels": "加载模型中...",
+        "noModels": "无可用模型"
     },
     "noResponseTimeout": "未收到模型回复。服务提供商可能不可用，或 API 密钥额度不足。请检查您的提供商设置。",
     "processingToolResults": "正在处理工具结果…"

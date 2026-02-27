@@ -33,7 +33,9 @@
       "change": "Change provider",
       "add": "Add Provider",
       "save": "Save",
-      "validate": "Validate"
+      "validate": "Validate",
+      "fetchModels": "Fetch Models",
+      "fetchingModels": "Fetching..."
     },
     "card": {
       "default": "Default",
@@ -41,7 +43,8 @@
       "noKey": "No API key set",
       "setDefault": "Set as default",
       "editKey": "Edit API key",
-      "delete": "Delete provider"
+      "delete": "Delete provider",
+      "testConnection": "Test connection"
     },
     "toast": {
       "added": "Provider added successfully",
@@ -53,7 +56,11 @@
       "updated": "Provider updated",
       "failedUpdate": "Failed to update provider",
       "invalidKey": "Invalid API key",
-      "modelRequired": "Model ID is required"
+      "modelRequired": "Model ID is required",
+      "modelsFetched": "{{count}} models fetched",
+      "failedFetchModels": "Failed to fetch models",
+      "connectionOk": "Connection OK! {{count}} models available",
+      "connectionFailed": "Connection failed"
     },
     "oauth": {
       "loginMode": "OAuth Login",

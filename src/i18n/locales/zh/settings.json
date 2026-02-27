@@ -33,7 +33,9 @@
       "change": "更换提供商",
       "add": "添加提供商",
       "save": "保存",
-      "validate": "验证"
+      "validate": "验证",
+      "fetchModels": "拉取模型",
+      "fetchingModels": "拉取中..."
     },
     "card": {
       "default": "默认",
@@ -41,7 +43,8 @@
       "noKey": "未设置 API 密钥",
       "setDefault": "设为默认",
       "editKey": "编辑 API 密钥",
-      "delete": "删除提供商"
+      "delete": "删除提供商",
+      "testConnection": "测试连接"
     },
     "toast": {
       "added": "提供商添加成功",
@@ -53,7 +56,11 @@
       "updated": "提供商已更新",
       "failedUpdate": "更新提供商失败",
       "invalidKey": "无效的 API 密钥",
-      "modelRequired": "需要模型 ID"
+      "modelRequired": "需要模型 ID",
+      "modelsFetched": "已拉取 {{count}} 个模型",
+      "failedFetchModels": "拉取模型列表失败",
+      "connectionOk": "连接成功！可用模型 {{count}} 个",
+      "connectionFailed": "连接失败"
     },
     "oauth": {
       "loginMode": "OAuth 登录",

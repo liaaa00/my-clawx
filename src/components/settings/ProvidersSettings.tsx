@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Copy,
   XCircle,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -210,9 +211,39 @@ function ProviderCard({
   const [showKey, setShowKey] = useState(false);
   const [validating, setValidating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   const typeInfo = PROVIDER_TYPE_INFO.find((t) => t.id === provider.type);
   const canEditConfig = Boolean(typeInfo?.showBaseUrl || typeInfo?.showModelId);
+
+  // Fetch available models from the provider's API
+  const handleFetchModels = async () => {
+    setFetchingModels(true);
+    try {
+      const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
+        type: provider.type,
+        baseUrl: baseUrl.trim() || provider.baseUrl || undefined,
+        apiKey: newKey.trim() || undefined, // use new key if entered, otherwise backend uses stored key
+      }) as { success: boolean; models?: string[]; error?: string; source?: string };
+
+      if (res?.success && Array.isArray(res.models) && res.models.length > 0) {
+        setFetchedModels(res.models);
+        // Auto-select first model if current field is empty
+        if (!modelId.trim() || !res.models.includes(modelId)) {
+          setModelId(res.models[0]);
+        }
+        toast.success(t('aiProviders.toast.modelsFetched', { count: res.models.length }));
+      } else {
+        toast.error(t('aiProviders.toast.failedFetchModels'));
+      }
+    } catch (e) {
+      toast.error(`${t('aiProviders.toast.failedFetchModels')}: ${String(e)}`);
+    } finally {
+      setFetchingModels(false);
+    }
+  };
 
   useEffect(() => {
     if (isEditing) {
@@ -220,8 +251,28 @@ function ProviderCard({
       setShowKey(false);
       setBaseUrl(provider.baseUrl || '');
       setModelId(provider.model || '');
+      setFetchedModels([]);
+      // Auto-fetch models when entering edit mode (if provider has key)
+      if (typeInfo?.showModelId && provider.hasKey) {
+        // Small delay to let the UI render first
+        const timer = setTimeout(() => {
+          setFetchingModels(true);
+          window.electron.ipcRenderer.invoke('provider:fetchModels', {
+            type: provider.type,
+            baseUrl: provider.baseUrl || undefined,
+          }).then((res: unknown) => {
+            const result = res as { success: boolean; models?: string[]; source?: string };
+            if (result?.success && Array.isArray(result.models) && result.models.length > 0) {
+              setFetchedModels(result.models);
+            }
+          }).catch(() => { /* ignore auto-fetch errors */ }).finally(() => {
+            setFetchingModels(false);
+          });
+        }, 300);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [isEditing, provider.baseUrl, provider.model]);
+  }, [isEditing, provider.baseUrl, provider.model, provider.hasKey, provider.type, typeInfo?.showModelId]);
 
   const handleSaveEdits = async () => {
     setSaving(true);
@@ -316,13 +367,44 @@ function ProviderCard({
                 )}
                 {typeInfo?.showModelId && (
                   <div className="space-y-1">
-                    <Label className="text-xs">{t('aiProviders.dialog.modelId')}</Label>
-                    <Input
-                      value={modelId}
-                      onChange={(e) => setModelId(e.target.value)}
-                      placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
-                      className="h-9 text-sm"
-                    />
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs">{t('aiProviders.dialog.modelId')}</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-xs"
+                        onClick={handleFetchModels}
+                        disabled={fetchingModels}
+                      >
+                        {fetchingModels ? (
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        ) : (
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                        )}
+                        {fetchingModels ? t('aiProviders.dialog.fetchingModels') : t('aiProviders.dialog.fetchModels')}
+                      </Button>
+                    </div>
+                    {fetchedModels.length > 0 ? (
+                      <select
+                        value={modelId}
+                        onChange={(e) => setModelId(e.target.value)}
+                        className="w-full h-9 text-sm rounded-md border border-input bg-background px-3 py-1 shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {!fetchedModels.includes(modelId) && modelId.trim() && (
+                          <option value={modelId}>{modelId} (current)</option>
+                        )}
+                        {fetchedModels.map((m) => (
+                          <option key={m} value={m}>{m}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <Input
+                        value={modelId}
+                        onChange={(e) => setModelId(e.target.value)}
+                        placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
+                        className="h-9 text-sm"
+                      />
+                    )}
                   </div>
                 )}
               </>
@@ -415,6 +497,39 @@ function ProviderCard({
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onEdit} title={t('aiProviders.card.editKey')}>
                 <Edit className="h-3.5 w-3.5" />
               </Button>
+              {provider.hasKey && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={async () => {
+                    setTesting(true);
+                    try {
+                      const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
+                        type: provider.type,
+                        baseUrl: provider.baseUrl || undefined,
+                      }) as { success: boolean; models?: string[]; error?: string };
+                      if (res?.success && Array.isArray(res.models) && res.models.length > 0) {
+                        toast.success(t('aiProviders.toast.connectionOk', { count: res.models.length }));
+                      } else {
+                        toast.error(t('aiProviders.toast.connectionFailed'));
+                      }
+                    } catch (e) {
+                      toast.error(`${t('aiProviders.toast.connectionFailed')}: ${String(e)}`);
+                    } finally {
+                      setTesting(false);
+                    }
+                  }}
+                  disabled={testing}
+                  title={t('aiProviders.card.testConnection')}
+                >
+                  {testing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Zap className="h-3.5 w-3.5" />
+                  )}
+                </Button>
+              )}
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDelete} title={t('aiProviders.card.delete')}>
                 <Trash2 className="h-3.5 w-3.5 text-destructive" />
               </Button>
