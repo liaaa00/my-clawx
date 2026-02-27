@@ -15,5 +15,7 @@
         "refresh": "チャットを更新",
         "showThinking": "思考を表示",
         "hideThinking": "思考を非表示"
-    }
+    },
+    "noResponseTimeout": "モデルからの応答がありません。プロバイダーが利用できないか、APIキーの残高が不足している可能性があります。プロバイダー設定を確認してください。",
+    "processingToolResults": "ツール結果を処理中…"
 }

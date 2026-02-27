@@ -51,6 +51,7 @@ export function Settings() {
     setAutoDownloadUpdate,
     devModeUnlocked,
     setDevModeUnlocked,
+    resetSetup,
   } = useSettingsStore();
 
   const { status: gatewayStatus, restart: restartGateway } = useGatewayStore();
@@ -428,6 +429,25 @@ export function Settings() {
               checked={devModeUnlocked}
               onCheckedChange={setDevModeUnlocked}
             />
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between">
+            <div>
+              <Label>Reset Setup Wizard</Label>
+              <p className="text-sm text-muted-foreground">
+                Resets the application to its first-launch state.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                resetSetup();
+                toast.success("Setup wizard reset! Please restart the app.");
+              }}
+            >
+              Reset Wizard
+            </Button>
           </div>
         </CardContent>
       </Card>

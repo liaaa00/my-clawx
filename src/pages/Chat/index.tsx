@@ -126,16 +126,16 @@ export function Chat() {
                 <ChatMessage
                   message={(streamMsg
                     ? {
-                        ...(streamMsg as Record<string, unknown>),
-                        role: (typeof streamMsg.role === 'string' ? streamMsg.role : 'assistant') as RawMessage['role'],
-                        content: streamMsg.content ?? streamText,
-                        timestamp: streamMsg.timestamp ?? streamingTimestamp,
-                      }
+                      ...(streamMsg as Record<string, unknown>),
+                      role: (typeof streamMsg.role === 'string' ? streamMsg.role : 'assistant') as RawMessage['role'],
+                      content: streamMsg.content ?? streamText,
+                      timestamp: streamMsg.timestamp ?? streamingTimestamp,
+                    }
                     : {
-                        role: 'assistant',
-                        content: streamText,
-                        timestamp: streamingTimestamp,
-                      }) as RawMessage}
+                      role: 'assistant',
+                      content: streamText,
+                      timestamp: streamingTimestamp,
+                    }) as RawMessage}
                   showThinking={showThinking}
                   isStreaming
                   streamingTools={streamingTools}
@@ -242,6 +242,7 @@ function TypingIndicator() {
 // ── Activity Indicator (shown between tool cycles) ─────────────
 
 function ActivityIndicator({ phase }: { phase: 'tool_processing' }) {
+  const { t } = useTranslation('chat');
   void phase;
   return (
     <div className="flex gap-3">
@@ -251,7 +252,7 @@ function ActivityIndicator({ phase }: { phase: 'tool_processing' }) {
       <div className="bg-muted rounded-2xl px-4 py-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-          <span>Processing tool results…</span>
+          <span>{t('processingToolResults')}</span>
         </div>
       </div>
     </div>

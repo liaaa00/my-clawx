@@ -4,6 +4,7 @@
  * Communicates with OpenClaw Gateway via gateway:rpc IPC.
  */
 import { create } from 'zustand';
+import i18n from '@/i18n';
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -1206,7 +1207,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       }
       clearHistoryPoll();
       set({
-        error: 'No response received from the model. The provider may be unavailable or the API key may have insufficient quota. Please check your provider settings.',
+        error: i18n.t('chat:noResponseTimeout'),
         sending: false,
         activeRunId: null,
         lastUserMessageAt: null,

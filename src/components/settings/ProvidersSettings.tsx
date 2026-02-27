@@ -453,6 +453,10 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
+  // Model Fetching State
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+
   // OAuth Flow State
   const [oauthFlowing, setOauthFlowing] = useState(false);
   const [oauthData, setOauthData] = useState<{
@@ -510,16 +514,14 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
       setOauthData(null);
     };
 
-    window.electron.ipcRenderer.on('oauth:code', handleCode);
-    window.electron.ipcRenderer.on('oauth:success', handleSuccess);
-    window.electron.ipcRenderer.on('oauth:error', handleError);
+    const unsubCode = window.electron.ipcRenderer.on('oauth:code', handleCode);
+    const unsubSuccess = window.electron.ipcRenderer.on('oauth:success', handleSuccess);
+    const unsubError = window.electron.ipcRenderer.on('oauth:error', handleError);
 
     return () => {
-      if (typeof window.electron.ipcRenderer.off === 'function') {
-        window.electron.ipcRenderer.off('oauth:code', handleCode);
-        window.electron.ipcRenderer.off('oauth:success', handleSuccess);
-        window.electron.ipcRenderer.off('oauth:error', handleError);
-      }
+      if (typeof unsubCode === 'function') unsubCode();
+      if (typeof unsubSuccess === 'function') unsubSuccess();
+      if (typeof unsubError === 'function') unsubError();
     };
   }, []);
 
@@ -543,6 +545,57 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
     setOauthError(null);
     await window.electron.ipcRenderer.invoke('provider:cancelOAuth');
   };
+
+  const handleFetchModels = async (silent = false) => {
+    if (!selectedType) return;
+    if (typeInfo?.requiresApiKey && !apiKey.trim()) {
+      if (!silent) toast.error(t('aiProviders.toast.invalidKey'));
+      return;
+    }
+
+    setFetchingModels(true);
+    setFetchedModels([]);
+
+    try {
+      // Pass params directly — no temp provider needed
+      const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
+        type: selectedType,
+        baseUrl: baseUrl.trim() || undefined,
+        apiKey: apiKey.trim() || undefined,
+      }) as { success: boolean; models?: string[]; error?: string; source?: string };
+
+      if (res?.success && Array.isArray(res.models) && res.models.length > 0) {
+        setFetchedModels(res.models);
+        // Auto select first entry if field is empty
+        if (!modelId.trim() || !res.models.includes(modelId)) {
+          setModelId(res.models[0]);
+        }
+        if (!silent) toast.success(t('aiProviders.toast.modelsFetched', { count: res.models.length }));
+      } else {
+        if (!silent) toast.error(`${t('aiProviders.toast.failedFetchModels', res?.error || 'No models returned')}`);
+      }
+    } catch (e) {
+      if (!silent) toast.error(`${t('aiProviders.toast.failedFetchModels')}: ${String(e)}`);
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  // Auto-fetch models when baseUrl or apiKey changes
+  useEffect(() => {
+    if (!selectedType || !typeInfo?.showModelId) return;
+    // Do not trigger if key is required but missing
+    if (typeInfo?.requiresApiKey && !apiKey.trim()) return;
+
+    // Debounce auto-fetch
+    const timer = setTimeout(() => {
+      // Ignore if currently saving or oauth flowing to avoid overlaps
+      if (!saving && !oauthFlowing) {
+        handleFetchModels(true);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [baseUrl, apiKey, selectedType]);
 
   // Only custom can be added multiple times.
   const availableTypes = PROVIDER_TYPE_INFO.filter(
@@ -587,7 +640,7 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
         apiKey.trim(),
         {
           baseUrl: baseUrl.trim() || undefined,
-          model: (typeInfo?.defaultModelId || modelId.trim()) || undefined,
+          model: modelId.trim() || typeInfo?.defaultModelId || undefined,
         }
       );
     } catch {
@@ -734,16 +787,47 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
 
               {typeInfo?.showModelId && (
                 <div className="space-y-2">
-                  <Label htmlFor="modelId">{t('aiProviders.dialog.modelId')}</Label>
-                  <Input
-                    id="modelId"
-                    placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
-                    value={modelId}
-                    onChange={(e) => {
-                      setModelId(e.target.value);
-                      setValidationError(null);
-                    }}
-                  />
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="modelId">{t('aiProviders.dialog.modelId')}</Label>
+                    {(!isOAuth || (supportsApiKey && authMode === 'apikey')) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs text-muted-foreground"
+                        onClick={() => handleFetchModels(false)}
+                        disabled={fetchingModels || (typeInfo?.requiresApiKey && !apiKey.trim())}
+                      >
+                        {fetchingModels ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                        {t('aiProviders.dialog.fetchModels', 'Fetch Available Models')}
+                      </Button>
+                    )}
+                  </div>
+                  {fetchedModels.length > 0 ? (
+                    <select
+                      id="modelId"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      value={modelId}
+                      onChange={(e) => {
+                        setModelId(e.target.value);
+                        setValidationError(null);
+                      }}
+                    >
+                      {fetchedModels.map((m) => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id="modelId"
+                      placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
+                      value={modelId}
+                      onChange={(e) => {
+                        setModelId(e.target.value);
+                        setValidationError(null);
+                      }}
+                    />
+                  )}
                 </div>
               )}
               {/* Device OAuth Trigger — only shown when in OAuth mode */}

@@ -2,7 +2,7 @@
  * IPC Handlers
  * Registers all IPC handlers for main-renderer communication
  */
-import { ipcMain, BrowserWindow, shell, dialog, app, nativeImage } from 'electron';
+import { ipcMain, BrowserWindow, shell, dialog, app, nativeImage, net } from 'electron';
 import { existsSync, copyFileSync, statSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, extname, basename } from 'node:path';
@@ -46,7 +46,7 @@ import {
 import { checkUvInstalled, installUv, setupManagedPython } from '../utils/uv-setup';
 import { updateSkillConfig, getSkillConfig, getAllSkillConfigs } from '../utils/skill-config';
 import { whatsAppLoginManager } from '../utils/whatsapp-login';
-import { getProviderConfig } from '../utils/provider-registry';
+import { getProviderConfig, getCuratedModels } from '../utils/provider-registry';
 import { deviceOAuthManager, OAuthProviderType } from '../utils/device-oauth';
 
 /**
@@ -935,7 +935,9 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
         if (defaultProviderId === providerId) {
           try {
             const modelOverride = nextConfig.model
-              ? `${nextConfig.type}/${nextConfig.model}`
+              ? (nextConfig.model.startsWith(`${nextConfig.type}/`)
+                ? nextConfig.model
+                : `${nextConfig.type}/${nextConfig.model}`)
               : undefined;
             if (nextConfig.type === 'custom' || nextConfig.type === 'ollama') {
               setOpenClawDefaultModelWithOverride(nextConfig.type, modelOverride, {
@@ -958,7 +960,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
                 });
               }
             } else {
-              setOpenClawDefaultModel(nextConfig.type, modelOverride);
+              setOpenClawDefaultModel(nextConfig.type, modelOverride, nextConfig.baseUrl);
             }
           } catch (err) {
             console.warn('Failed to sync openclaw config after provider update:', err);
@@ -1053,7 +1055,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
                 api: 'openai-completions',
               });
             } else {
-              setOpenClawDefaultModel(provider.type, modelOverride);
+              setOpenClawDefaultModel(provider.type, modelOverride, provider.baseUrl);
             }
 
             // Keep auth-profiles in sync with the default provider instance.
@@ -1094,9 +1096,10 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
           // The gateway caches provider configs in models.json and reads from
           // there at request time; updating openclaw.json alone is not enough
           // when switching between multiple custom provider instances.
+          const currentProviderKey = await getApiKey(providerId);
           if (
             (provider.type === 'custom' || provider.type === 'ollama') &&
-            providerKey &&
+            currentProviderKey &&
             provider.baseUrl
           ) {
             const modelId = provider.model;
@@ -1104,7 +1107,7 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
               baseUrl: provider.baseUrl,
               api: 'openai-completions',
               models: modelId ? [{ id: modelId, name: modelId }] : [],
-              apiKey: providerKey,
+              apiKey: currentProviderKey,
             });
           }
 
@@ -1128,11 +1131,138 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
     }
   });
 
-
-
-  // Get default provider
+  // Get Default provider
   ipcMain.handle('provider:getDefault', async () => {
     return await getDefaultProvider();
+  });
+
+  // Fetch available models from a provider's /models endpoint.
+  // Accepts direct params: { type, baseUrl?, apiKey? }
+  // Falls back to curated model list if API fails or times out.
+  ipcMain.handle('provider:fetchModels', async (_, params: string | { type: string; baseUrl?: string; apiKey?: string }) => {
+    // Support both old-style providerId (string) and new direct params (object)
+    let providerType: string;
+    let baseUrl: string | undefined;
+    let apiKey: string | undefined;
+
+    if (typeof params === 'string') {
+      // Legacy: providerId passed directly
+      const provider = await getProvider(params);
+      if (!provider) {
+        return { success: false, error: `Provider ${params} not found` };
+      }
+      providerType = provider.type;
+      baseUrl = provider.baseUrl;
+      apiKey = (await getApiKey(params)) ?? undefined;
+    } else {
+      providerType = params.type;
+      baseUrl = params.baseUrl;
+      apiKey = params.apiKey;
+    }
+
+    console.log(`[fetchModels] type=${providerType}, baseUrl=${baseUrl}`);
+
+    // Resolve default base URL if not provided
+    if (!baseUrl) {
+      const defaults: Record<string, string> = {
+        ollama: 'http://localhost:11434',
+        siliconflow: 'https://api.siliconflow.cn/v1',
+        aliyun: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+        volcengine: 'https://ark.cn-beijing.volces.com/api/v3',
+        moonshot: 'https://api.moonshot.cn/v1',
+        openai: 'https://api.openai.com/v1',
+        openrouter: 'https://openrouter.ai/api/v1',
+        anthropic: 'https://api.anthropic.com/v1',
+      };
+      baseUrl = defaults[providerType];
+    }
+
+    if (!baseUrl) {
+      // No base URL — return curated list directly
+      const curated = getCuratedModels(providerType);
+      if (curated && curated.length > 0) return { success: true, models: curated, source: 'curated' };
+      return { success: false, error: 'No base URL configured and no curated models available' };
+    }
+
+    try {
+      // Clean up baseUrl and build models endpoint
+      baseUrl = baseUrl.replace(/\/+$/, '');
+      const endpointsToTry = providerType === 'volcengine'
+        ? [`${baseUrl}/endpoints`, `${baseUrl}/models`]
+        : [`${baseUrl}/models`];
+
+      const headers: Record<string, string> = {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 ClawX/1.0.0',
+      };
+      if (apiKey) {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
+
+      let lastError: any = null;
+      for (const fetchUrl of endpointsToTry) {
+        console.log(`[fetchModels] Trying: ${fetchUrl}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+
+        try {
+          // Try Electron's net.fetch first (handles system proxy)
+          let response: Response;
+          try {
+            response = await net.fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal }) as unknown as Response;
+          } catch (e) {
+            // If net.fetch fails with SSL/reset, try native fetch as fallback
+            console.warn(`[fetchModels] net.fetch failed for ${fetchUrl}, trying Node fetch fallback:`, e);
+            response = await fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal });
+          }
+
+          console.log(`[fetchModels] ${fetchUrl} status: ${response.status}`);
+          if (response.ok) {
+            const data = await response.json() as Record<string, unknown>;
+
+            // Volcengine /endpoints schema: { Result: { Endpoints: [{ EndpointId: "ep-xxx" }] } }
+            if (data && typeof data.Result === 'object' && Array.isArray((data.Result as any).Endpoints)) {
+              const models = (data.Result as any).Endpoints.map((e: any) => e.EndpointId).filter(Boolean);
+              if (models.length > 0) {
+                console.log(`[fetchModels] Found ${models.length} endpoints from Volcengine API`);
+                return { success: true, models, source: 'api' };
+              }
+            }
+
+            // OpenAI /models schema
+            if (data && Array.isArray(data.data)) {
+              const models = (data.data as any[]).map((m) => m.id).filter(Boolean);
+              if (models.length > 0) return { success: true, models, source: 'api' };
+            }
+
+            // Ollama /models schema
+            if (data && Array.isArray(data.models)) {
+              const models = (data.models as any[]).map((m) => m.name || m.id).filter(Boolean);
+              if (models.length > 0) return { success: true, models, source: 'api' };
+            }
+          }
+        } catch (e) {
+          lastError = e;
+          console.error(`[fetchModels] Failed ${fetchUrl}:`, e);
+        } finally {
+          clearTimeout(timeout);
+        }
+      }
+
+      // If we reach here, all API attempts failed or returned no models
+      const curated = getCuratedModels(providerType);
+      if (curated && curated.length > 0) {
+        console.log(`[fetchModels] All API calls failed, falling back to curated list`);
+        return { success: true, models: curated, source: 'curated' };
+      }
+      return { success: false, error: lastError ? String(lastError) : 'No models found' };
+    } catch (error) {
+      console.log(`[fetchModels] Final catch error: ${String(error)}`);
+      const curated = getCuratedModels(providerType);
+      if (curated && curated.length > 0) return { success: true, models: curated, source: 'curated' };
+      return { success: false, error: String(error) };
+    }
   });
 
   // Validate API key by making a real test request to the provider.
@@ -1165,266 +1295,268 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       }
     }
   );
-}
 
-type ValidationProfile = 'openai-compatible' | 'google-query-key' | 'anthropic-header' | 'openrouter' | 'none';
+  type ValidationProfile = 'openai-compatible' | 'google-query-key' | 'anthropic-header' | 'openrouter' | 'none';
 
-/**
- * Validate API key using lightweight model-listing endpoints (zero token cost).
- * Providers are grouped into 3 auth styles:
- * - openai-compatible: Bearer auth + /models
- * - google-query-key: ?key=... + /models
- * - anthropic-header: x-api-key + anthropic-version + /models
- */
-async function validateApiKeyWithProvider(
-  providerType: string,
-  apiKey: string,
-  options?: { baseUrl?: string }
-): Promise<{ valid: boolean; error?: string }> {
-  const profile = getValidationProfile(providerType);
-  if (profile === 'none') {
-    return { valid: true };
-  }
-
-  const trimmedKey = apiKey.trim();
-  if (!trimmedKey) {
-    return { valid: false, error: 'API key is required' };
-  }
-
-  try {
-    switch (profile) {
-      case 'openai-compatible':
-        return await validateOpenAiCompatibleKey(providerType, trimmedKey, options?.baseUrl);
-      case 'google-query-key':
-        return await validateGoogleQueryKey(providerType, trimmedKey, options?.baseUrl);
-      case 'anthropic-header':
-        return await validateAnthropicHeaderKey(providerType, trimmedKey, options?.baseUrl);
-      case 'openrouter':
-        return await validateOpenRouterKey(providerType, trimmedKey);
-      default:
-        return { valid: false, error: `Unsupported validation profile for provider: ${providerType}` };
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    return { valid: false, error: errorMessage };
-  }
-}
-
-function logValidationStatus(provider: string, status: number): void {
-  console.log(`[clawx-validate] ${provider} HTTP ${status}`);
-}
-
-function maskSecret(secret: string): string {
-  if (!secret) return '';
-  if (secret.length <= 8) return `${secret.slice(0, 2)}***`;
-  return `${secret.slice(0, 4)}***${secret.slice(-4)}`;
-}
-
-function sanitizeValidationUrl(rawUrl: string): string {
-  try {
-    const url = new URL(rawUrl);
-    const key = url.searchParams.get('key');
-    if (key) url.searchParams.set('key', maskSecret(key));
-    return url.toString();
-  } catch {
-    return rawUrl;
-  }
-}
-
-function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
-  const next = { ...headers };
-  if (next.Authorization?.startsWith('Bearer ')) {
-    const token = next.Authorization.slice('Bearer '.length);
-    next.Authorization = `Bearer ${maskSecret(token)}`;
-  }
-  if (next['x-api-key']) {
-    next['x-api-key'] = maskSecret(next['x-api-key']);
-  }
-  return next;
-}
-
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.trim().replace(/\/+$/, '');
-}
-
-function buildOpenAiModelsUrl(baseUrl: string): string {
-  return `${normalizeBaseUrl(baseUrl)}/models?limit=1`;
-}
-
-function logValidationRequest(
-  provider: string,
-  method: string,
-  url: string,
-  headers: Record<string, string>
-): void {
-  console.log(
-    `[clawx-validate] ${provider} request ${method} ${sanitizeValidationUrl(url)} headers=${JSON.stringify(sanitizeHeaders(headers))}`
-  );
-}
-
-function getValidationProfile(providerType: string): ValidationProfile {
-  switch (providerType) {
-    case 'anthropic':
-      return 'anthropic-header';
-    case 'google':
-      return 'google-query-key';
-    case 'openrouter':
-      return 'openrouter';
-    case 'ollama':
-      return 'none';
-    default:
-      return 'openai-compatible';
-  }
-}
-
-async function performProviderValidationRequest(
-  providerLabel: string,
-  url: string,
-  headers: Record<string, string>
-): Promise<{ valid: boolean; error?: string }> {
-  try {
-    logValidationRequest(providerLabel, 'GET', url, headers);
-    const response = await fetch(url, { headers });
-    logValidationStatus(providerLabel, response.status);
-    const data = await response.json().catch(() => ({}));
-    return classifyAuthResponse(response.status, data);
-  } catch (error) {
-    return {
-      valid: false,
-      error: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
-}
-
-/**
- * Helper: classify an HTTP response as valid / invalid / error.
- * 200 / 429 → valid (key works, possibly rate-limited).
- * 401 / 403 → invalid.
- * Everything else → return the API error message.
- */
-function classifyAuthResponse(
-  status: number,
-  data: unknown
-): { valid: boolean; error?: string } {
-  if (status >= 200 && status < 300) return { valid: true };
-  if (status === 429) return { valid: true }; // rate-limited but key is valid
-  if (status === 401 || status === 403) return { valid: false, error: 'Invalid API key' };
-
-  // Try to extract an error message
-  const obj = data as { error?: { message?: string }; message?: string } | null;
-  const msg = obj?.error?.message || obj?.message || `API error: ${status}`;
-  return { valid: false, error: msg };
-}
-
-async function validateOpenAiCompatibleKey(
-  providerType: string,
-  apiKey: string,
-  baseUrl?: string
-): Promise<{ valid: boolean; error?: string }> {
-  const trimmedBaseUrl = baseUrl?.trim();
-  if (!trimmedBaseUrl) {
-    return { valid: false, error: `Base URL is required for provider "${providerType}" validation` };
-  }
-
-  const headers = { Authorization: `Bearer ${apiKey}` };
-
-  // Try /models first (standard OpenAI-compatible endpoint)
-  const modelsUrl = buildOpenAiModelsUrl(trimmedBaseUrl);
-  const modelsResult = await performProviderValidationRequest(providerType, modelsUrl, headers);
-
-  // If /models returned 404, the provider likely doesn't implement it (e.g. MiniMax).
-  // Fall back to a minimal /chat/completions POST which almost all providers support.
-  if (modelsResult.error?.includes('API error: 404')) {
-    console.log(
-      `[clawx-validate] ${providerType} /models returned 404, falling back to /chat/completions probe`
-    );
-    const base = normalizeBaseUrl(trimmedBaseUrl);
-    const chatUrl = `${base}/chat/completions`;
-    return await performChatCompletionsProbe(providerType, chatUrl, headers);
-  }
-
-  return modelsResult;
-}
-
-/**
- * Fallback validation: send a minimal /chat/completions request.
- * We intentionally use max_tokens=1 to minimise cost. The goal is only to
- * distinguish auth errors (401/403) from a working key (200/400/429).
- * A 400 "invalid model" still proves the key itself is accepted.
- */
-async function performChatCompletionsProbe(
-  providerLabel: string,
-  url: string,
-  headers: Record<string, string>
-): Promise<{ valid: boolean; error?: string }> {
-  try {
-    logValidationRequest(providerLabel, 'POST', url, headers);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'validation-probe',
-        messages: [{ role: 'user', content: 'hi' }],
-        max_tokens: 1,
-      }),
-    });
-    logValidationStatus(providerLabel, response.status);
-    const data = await response.json().catch(() => ({}));
-
-    // 401/403 → invalid key
-    if (response.status === 401 || response.status === 403) {
-      return { valid: false, error: 'Invalid API key' };
-    }
-    // 200, 400 (bad model but key accepted), 429 → key is valid
-    if (
-      (response.status >= 200 && response.status < 300) ||
-      response.status === 400 ||
-      response.status === 429
-    ) {
+  /**
+   * Validate API key using lightweight model-listing endpoints (zero token cost).
+   * Providers are grouped into 3 auth styles:
+   * - openai-compatible: Bearer auth + /models
+   * - google-query-key: ?key=... + /models
+   * - anthropic-header: x-api-key + anthropic-version + /models
+   */
+  async function validateApiKeyWithProvider(
+    providerType: string,
+    apiKey: string,
+    options?: { baseUrl?: string }
+  ): Promise<{ valid: boolean; error?: string }> {
+    const profile = getValidationProfile(providerType);
+    if (profile === 'none') {
       return { valid: true };
     }
-    return classifyAuthResponse(response.status, data);
-  } catch (error) {
-    return {
-      valid: false,
-      error: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
-    };
+
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      return { valid: false, error: 'API key is required' };
+    }
+
+    try {
+      switch (profile) {
+        case 'openai-compatible':
+          return await validateOpenAiCompatibleKey(providerType, trimmedKey, options?.baseUrl);
+        case 'google-query-key':
+          return await validateGoogleQueryKey(providerType, trimmedKey, options?.baseUrl);
+        case 'anthropic-header':
+          return await validateAnthropicHeaderKey(providerType, trimmedKey, options?.baseUrl);
+        case 'openrouter':
+          return await validateOpenRouterKey(providerType, trimmedKey);
+        default:
+          return { valid: false, error: `Unsupported validation profile for provider: ${providerType}` };
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { valid: false, error: errorMessage };
+    }
   }
-}
 
-async function validateGoogleQueryKey(
-  providerType: string,
-  apiKey: string,
-  baseUrl?: string
-): Promise<{ valid: boolean; error?: string }> {
-  // Default to the official Google Gemini API base URL if none is provided
-  const base = normalizeBaseUrl(baseUrl || 'https://generativelanguage.googleapis.com/v1beta');
-  const url = `${base}/models?pageSize=1&key=${encodeURIComponent(apiKey)}`;
-  return await performProviderValidationRequest(providerType, url, {});
-}
+  function logValidationStatus(provider: string, status: number): void {
+    console.log(`[clawx-validate] ${provider} HTTP ${status}`);
+  }
 
-async function validateAnthropicHeaderKey(
-  providerType: string,
-  apiKey: string,
-  baseUrl?: string
-): Promise<{ valid: boolean; error?: string }> {
-  const base = normalizeBaseUrl(baseUrl || 'https://api.anthropic.com/v1');
-  const url = `${base}/models?limit=1`;
-  const headers = {
-    'x-api-key': apiKey,
-    'anthropic-version': '2023-06-01',
-  };
-  return await performProviderValidationRequest(providerType, url, headers);
-}
+  function maskSecret(secret: string): string {
+    if (!secret) return '';
+    if (secret.length <= 8) return `${secret.slice(0, 2)}***`;
+    return `${secret.slice(0, 4)}***${secret.slice(-4)}`;
+  }
 
-async function validateOpenRouterKey(
-  providerType: string,
-  apiKey: string
-): Promise<{ valid: boolean; error?: string }> {
-  // Use OpenRouter's auth check endpoint instead of public /models
-  const url = 'https://openrouter.ai/api/v1/auth/key';
-  const headers = { Authorization: `Bearer ${apiKey}` };
-  return await performProviderValidationRequest(providerType, url, headers);
+  function sanitizeValidationUrl(rawUrl: string): string {
+    try {
+      const url = new URL(rawUrl);
+      const key = url.searchParams.get('key');
+      if (key) url.searchParams.set('key', maskSecret(key));
+      return url.toString();
+    } catch {
+      return rawUrl;
+    }
+  }
+
+  function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+    const next = { ...headers };
+    if (next.Authorization?.startsWith('Bearer ')) {
+      const token = next.Authorization.slice('Bearer '.length);
+      next.Authorization = `Bearer ${maskSecret(token)}`;
+    }
+    if (next['x-api-key']) {
+      next['x-api-key'] = maskSecret(next['x-api-key']);
+    }
+    return next;
+  }
+
+  function normalizeBaseUrl(baseUrl: string): string {
+    return baseUrl.trim().replace(/\/+$/, '');
+  }
+
+  function buildOpenAiModelsUrl(baseUrl: string): string {
+    return `${normalizeBaseUrl(baseUrl)}/models?limit=1`;
+  }
+
+  function logValidationRequest(
+    provider: string,
+    method: string,
+    url: string,
+    headers: Record<string, string>
+  ): void {
+    console.log(
+      `[clawx-validate] ${provider} request ${method} ${sanitizeValidationUrl(url)} headers=${JSON.stringify(sanitizeHeaders(headers))}`
+    );
+  }
+
+  function getValidationProfile(providerType: string): ValidationProfile {
+    switch (providerType) {
+      case 'anthropic':
+        return 'anthropic-header';
+      case 'google':
+        return 'google-query-key';
+      case 'openrouter':
+        return 'openrouter';
+      case 'ollama':
+        return 'none';
+      default:
+        return 'openai-compatible';
+    }
+  }
+
+  async function performProviderValidationRequest(
+    providerLabel: string,
+    url: string,
+    headers: Record<string, string>
+  ): Promise<{ valid: boolean; error?: string }> {
+    try {
+      logValidationRequest(providerLabel, 'GET', url, headers);
+      // Use Electron's net.fetch for validation too
+      const response = await net.fetch(url, { headers }) as unknown as Response;
+      logValidationStatus(providerLabel, response.status);
+      const data = await response.json().catch(() => ({}));
+      return classifyAuthResponse(response.status, data);
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  /**
+   * Helper: classify an HTTP response as valid / invalid / error.
+   * 200 / 429 → valid (key works, possibly rate-limited).
+   * 401 / 403 → invalid.
+   * Everything else → return the API error message.
+   */
+  function classifyAuthResponse(
+    status: number,
+    data: unknown
+  ): { valid: boolean; error?: string } {
+    if (status >= 200 && status < 300) return { valid: true };
+    if (status === 429) return { valid: true }; // rate-limited but key is valid
+    if (status === 401 || status === 403) return { valid: false, error: 'Invalid API key' };
+
+    // Try to extract an error message
+    const obj = data as { error?: { message?: string }; message?: string } | null;
+    const msg = obj?.error?.message || obj?.message || `API error: ${status}`;
+    return { valid: false, error: msg };
+  }
+
+  async function validateOpenAiCompatibleKey(
+    providerType: string,
+    apiKey: string,
+    baseUrl?: string
+  ): Promise<{ valid: boolean; error?: string }> {
+    const trimmedBaseUrl = baseUrl?.trim();
+    if (!trimmedBaseUrl) {
+      return { valid: false, error: `Base URL is required for provider "${providerType}" validation` };
+    }
+
+    const headers = { Authorization: `Bearer ${apiKey}` };
+
+    // Try /models first (standard OpenAI-compatible endpoint)
+    const modelsUrl = buildOpenAiModelsUrl(trimmedBaseUrl);
+    const modelsResult = await performProviderValidationRequest(providerType, modelsUrl, headers);
+
+    // If /models returned 404, the provider likely doesn't implement it (e.g. MiniMax).
+    // Fall back to a minimal /chat/completions POST which almost all providers support.
+    if (modelsResult.error?.includes('API error: 404')) {
+      console.log(
+        `[clawx-validate] ${providerType} /models returned 404, falling back to /chat/completions probe`
+      );
+      const base = normalizeBaseUrl(trimmedBaseUrl);
+      const chatUrl = `${base}/chat/completions`;
+      return await performChatCompletionsProbe(providerType, chatUrl, headers);
+    }
+
+    return modelsResult;
+  }
+
+  /**
+   * Fallback validation: send a minimal /chat/completions request.
+   * We intentionally use max_tokens=1 to minimise cost. The goal is only to
+   * distinguish auth errors (401/403) from a working key (200/400/429).
+   * A 400 "invalid model" still proves the key itself is accepted.
+   */
+  async function performChatCompletionsProbe(
+    providerLabel: string,
+    url: string,
+    headers: Record<string, string>
+  ): Promise<{ valid: boolean; error?: string }> {
+    try {
+      logValidationRequest(providerLabel, 'POST', url, headers);
+      // Use Electron's net.fetch for probe
+      const response = await net.fetch(url, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'validation-probe',
+          messages: [{ role: 'user', content: 'hi' }],
+          max_tokens: 1,
+        }),
+      }) as unknown as Response;
+      logValidationStatus(providerLabel, response.status);
+      const data = await response.json().catch(() => ({}));
+
+      // 401/403 → invalid key
+      if (response.status === 401 || response.status === 403) {
+        return { valid: false, error: 'Invalid API key' };
+      }
+      // 200, 400 (bad model but key accepted), 429 → key is valid
+      if (
+        (response.status >= 200 && response.status < 300) ||
+        response.status === 400 ||
+        response.status === 429
+      ) {
+        return { valid: true };
+      }
+      return classifyAuthResponse(response.status, data);
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  async function validateGoogleQueryKey(
+    providerType: string,
+    apiKey: string,
+    baseUrl?: string
+  ): Promise<{ valid: boolean; error?: string }> {
+    // Default to the official Google Gemini API base URL if none is provided
+    const base = normalizeBaseUrl(baseUrl || 'https://generativelanguage.googleapis.com/v1beta');
+    const url = `${base}/models?pageSize=1&key=${encodeURIComponent(apiKey)}`;
+    return await performProviderValidationRequest(providerType, url, {});
+  }
+
+  async function validateAnthropicHeaderKey(
+    providerType: string,
+    apiKey: string,
+    baseUrl?: string
+  ): Promise<{ valid: boolean; error?: string }> {
+    const base = normalizeBaseUrl(baseUrl || 'https://api.anthropic.com/v1');
+    const url = `${base}/models?limit=1`;
+    const headers = {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    };
+    return await performProviderValidationRequest(providerType, url, headers);
+  }
+
+  async function validateOpenRouterKey(
+    providerType: string,
+    apiKey: string
+  ): Promise<{ valid: boolean; error?: string }> {
+    // Use OpenRouter's auth check endpoint instead of public /models
+    const url = 'https://openrouter.ai/api/v1/auth/key';
+    const headers = { Authorization: `Bearer ${apiKey}` };
+    return await performProviderValidationRequest(providerType, url, headers);
+  }
 }
 
 /**

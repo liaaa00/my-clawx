@@ -77,6 +77,7 @@ const electronAPI = {
         'provider:setDefault',
         'provider:getDefault',
         'provider:validateKey',
+        'provider:fetchModels',
         'provider:requestOAuth',
         'provider:cancelOAuth',
         // Cron

@@ -336,7 +336,7 @@ export function buildProviderEnvVars(providers: Array<{ type: string; apiKey: st
  * @param modelOverride - Optional model string to use instead of the registry default.
  *   For siliconflow this is the user-supplied model ID prefixed with "siliconflow/".
  */
-export function setOpenClawDefaultModel(provider: string, modelOverride?: string): void {
+export function setOpenClawDefaultModel(provider: string, modelOverride?: string, baseUrlOverride?: string): void {
   const configPath = join(homedir(), '.openclaw', 'openclaw.json');
 
   let config: Record<string, unknown> = {};
@@ -398,12 +398,12 @@ export function setOpenClawDefaultModel(provider: string, modelOverride?: string
 
     providers[provider] = {
       ...existingProvider,
-      baseUrl: providerCfg.baseUrl,
+      baseUrl: baseUrlOverride || providerCfg.baseUrl,
       api: providerCfg.api,
       apiKey: providerCfg.apiKeyEnv,
       models: mergedModels,
     };
-    console.log(`Configured models.providers.${provider} with baseUrl=${providerCfg.baseUrl}, model=${modelId}`);
+    console.log(`Configured models.providers.${provider} with baseUrl=${baseUrlOverride || providerCfg.baseUrl}, model=${modelId}`);
 
     models.providers = providers;
     config.models = models;

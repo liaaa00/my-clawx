@@ -716,6 +716,10 @@ function ProviderContent({
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const providerMenuRef = useRef<HTMLDivElement | null>(null);
 
+  // Model fetching state
+  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+
   const [authMode, setAuthMode] = useState<'oauth' | 'apikey'>('oauth');
 
   // OAuth Flow State
@@ -756,18 +760,14 @@ function ProviderContent({
       setOauthData(null);
     };
 
-    window.electron.ipcRenderer.on('oauth:code', handleCode);
-    window.electron.ipcRenderer.on('oauth:success', handleSuccess);
-    window.electron.ipcRenderer.on('oauth:error', handleError);
+    const unsubCode = window.electron.ipcRenderer.on('oauth:code', handleCode);
+    const unsubSuccess = window.electron.ipcRenderer.on('oauth:success', handleSuccess);
+    const unsubError = window.electron.ipcRenderer.on('oauth:error', handleError);
 
     return () => {
-      // Clean up manually if the API provides removeListener, though `on` in preloads might not return an unsub.
-      // Easiest is to just let it be, or if they have `off`:
-      if (typeof window.electron.ipcRenderer.off === 'function') {
-        window.electron.ipcRenderer.off('oauth:code', handleCode);
-        window.electron.ipcRenderer.off('oauth:success', handleSuccess);
-        window.electron.ipcRenderer.off('oauth:error', handleError);
-      }
+      if (typeof unsubCode === 'function') unsubCode();
+      if (typeof unsubSuccess === 'function') unsubSuccess();
+      if (typeof unsubError === 'function') unsubError();
     };
   }, [onConfiguredChange, t, selectedProvider]);
 
@@ -901,6 +901,54 @@ function ProviderContent({
   const isOAuth = selectedProviderData?.isOAuth ?? false;
   const supportsApiKey = selectedProviderData?.supportsApiKey ?? false;
   const useOAuthFlow = isOAuth && (!supportsApiKey || authMode === 'oauth');
+
+  // Auto-fetch models when baseUrl or apiKey change (same as Settings dialog)
+  const handleFetchModels = useCallback(async (silent = false) => {
+    if (!selectedProvider || !showModelIdField) return;
+    if (requiresKey && !apiKey.trim()) return;
+
+    setFetchingModels(true);
+    setFetchedModels([]);
+
+    try {
+      // Pass params directly — no temp provider needed
+      const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
+        type: selectedProvider,
+        baseUrl: baseUrl.trim() || undefined,
+        apiKey: apiKey.trim() || undefined,
+      }) as { success: boolean; models?: string[]; error?: string; source?: string };
+
+      if (res?.success && Array.isArray(res.models) && res.models.length > 0) {
+        setFetchedModels(res.models);
+        if (!modelId.trim() || !res.models.includes(modelId)) {
+          setModelId(res.models[0]);
+        }
+        if (!silent) {
+          const label = res.source === 'curated' ? 'curated' : 'API';
+          toast.success(`Found ${res.models.length} models (${label})`);
+        }
+      } else {
+        if (!silent) toast.error(res?.error || 'No models returned');
+      }
+    } catch (e) {
+      console.error('[Setup] handleFetchModels error:', e);
+      if (!silent) toast.error(`Failed to fetch models: ${String(e)}`);
+    } finally {
+      setFetchingModels(false);
+    }
+  }, [selectedProvider, showModelIdField, requiresKey, apiKey, baseUrl, modelId]);
+
+  useEffect(() => {
+    if (!selectedProvider || !showModelIdField) return;
+    if (requiresKey && !apiKey.trim()) return;
+
+    const timer = setTimeout(() => {
+      if (!validating && !oauthFlowing) {
+        handleFetchModels(true);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [baseUrl, apiKey, selectedProvider, showModelIdField, requiresKey, validating, oauthFlowing, handleFetchModels]);
 
   const handleValidateAndSave = async () => {
     if (!selectedProvider) return;
@@ -1109,22 +1157,51 @@ function ProviderContent({
             </div>
           )}
 
-          {/* Model ID field (for siliconflow etc.) */}
+          {/* Model ID field — auto-populates via /v1/models when possible */}
           {showModelIdField && (
             <div className="space-y-2">
-              <Label htmlFor="modelId">{t('provider.modelId')}</Label>
-              <Input
-                id="modelId"
-                type="text"
-                placeholder={selectedProviderData?.modelIdPlaceholder || 'e.g. deepseek-ai/DeepSeek-V3'}
-                value={modelId}
-                onChange={(e) => {
-                  setModelId(e.target.value);
-                  onConfiguredChange(false);
-                }}
-                autoComplete="off"
-                className="bg-background border-input"
-              />
+              <div className="flex items-center justify-between">
+                <Label htmlFor="modelId">{t('provider.modelId')}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 text-xs text-muted-foreground"
+                  onClick={() => handleFetchModels(false)}
+                  disabled={fetchingModels || (requiresKey && !apiKey.trim())}
+                >
+                  {fetchingModels ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  {fetchingModels ? 'Fetching...' : 'Fetch Models'}
+                </Button>
+              </div>
+              {fetchedModels.length > 0 ? (
+                <select
+                  id="modelId"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={modelId}
+                  onChange={(e) => {
+                    setModelId(e.target.value);
+                    onConfiguredChange(false);
+                  }}
+                >
+                  {fetchedModels.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  id="modelId"
+                  type="text"
+                  placeholder={selectedProviderData?.modelIdPlaceholder || 'e.g. deepseek-ai/DeepSeek-V3'}
+                  value={modelId}
+                  onChange={(e) => {
+                    setModelId(e.target.value);
+                    onConfiguredChange(false);
+                  }}
+                  autoComplete="off"
+                  className="bg-background border-input"
+                />
+              )}
               <p className="text-xs text-muted-foreground">
                 {t('provider.modelIdDesc')}
               </p>

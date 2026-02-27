@@ -88,7 +88,7 @@ export class ClawHubService {
 
             const isWin = process.platform === 'win32';
             const useShell = isWin && !this.useNodeRunner;
-            const env = {
+            const env: Record<string, string | undefined> = {
                 ...process.env,
                 CI: 'true',
                 FORCE_COLOR: '0',
@@ -155,19 +155,28 @@ export class ClawHubService {
                 return [];
             }
 
-            const lines = output.split('\n').filter(l => l.trim());
+            const lines = output.split('\n').filter(l => l.trim() && !l.startsWith('-') && !l.startsWith('√') && !l.startsWith('×'));
+
             return lines.map(line => {
                 const cleanLine = this.stripAnsi(line);
 
-                // Format could be: slug vversion description (score)
-                // Or sometimes: slug  vversion  description
-                const match = cleanLine.match(/^(\S+)\s+v?(\d+\.\S+)\s+(.+)$/);
-                if (match) {
-                    const slug = match[1];
-                    const version = match[2];
-                    let description = match[3];
+                // Try Format 1: slug  name  (score)  --> e.g. "weather  Weather  (3.788)"
+                const searchMatch = cleanLine.match(/^(\S+)\s+(.+?)\s+\([\d.]+\)$/);
+                if (searchMatch) {
+                    return {
+                        slug: searchMatch[1],
+                        name: searchMatch[2],
+                        version: '1.0.0', // Default version
+                        description: searchMatch[2], // Use name as description if not available
+                    };
+                }
 
-                    // Clean up score if present at the end
+                // Try Format 2: slug vversion description (score)
+                const versionMatch = cleanLine.match(/^(\S+)\s+v?(\d+\.\S+)\s+(.+)$/);
+                if (versionMatch) {
+                    const slug = versionMatch[1];
+                    const version = versionMatch[2];
+                    let description = versionMatch[3];
                     description = description.replace(/\(\d+\.\d+\)$/, '').trim();
 
                     return {
@@ -177,6 +186,18 @@ export class ClawHubService {
                         description,
                     };
                 }
+
+                // Try Format 3: slug  name / description (fallback)
+                const parts = cleanLine.split(/\s{2,}/);
+                if (parts.length >= 2) {
+                    return {
+                        slug: parts[0],
+                        name: parts[0],
+                        version: '1.0.0',
+                        description: parts[1],
+                    };
+                }
+
                 return null;
             }).filter((s): s is ClawHubSkillResult => s !== null);
         } catch (error) {
@@ -198,7 +219,8 @@ export class ClawHubService {
             const output = await this.runCommand(args);
             if (!output) return [];
 
-            const lines = output.split('\n').filter(l => l.trim());
+            const lines = output.split('\n').filter(l => l.trim() && !l.startsWith('-') && !l.startsWith('√') && !l.startsWith('×'));
+
             return lines.map(line => {
                 const cleanLine = this.stripAnsi(line);
 
@@ -213,6 +235,18 @@ export class ClawHubService {
                         description: match[4],
                     };
                 }
+
+                // Fallback for explore
+                const parts = cleanLine.split(/\s{2,}/);
+                if (parts.length >= 2) {
+                    return {
+                        slug: parts[0],
+                        name: parts[0],
+                        version: parts[1] || '1.0.0',
+                        description: parts[parts.length - 1],
+                    };
+                }
+
                 return null;
             }).filter((s): s is ClawHubSkillResult => s !== null);
         } catch (error) {
