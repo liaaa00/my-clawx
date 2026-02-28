@@ -53,9 +53,16 @@ export function ProvidersSettings() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
 
-  // Fetch providers on mount
+  // Fetch providers on mount + listen for backend changes (e.g. Ollama auto-detect)
   useEffect(() => {
     fetchProviders();
+
+    const unsubscribe = window.electron.ipcRenderer.on('providers:changed', () => {
+      fetchProviders();
+    });
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [fetchProviders]);
 
   const handleAddProvider = async (

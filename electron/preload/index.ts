@@ -166,6 +166,7 @@ const electronAPI = {
         'update:error',
         'update:auto-install-countdown',
         'cron:updated',
+        'providers:changed',
         'oauth:code',
         'oauth:success',
         'oauth:error',

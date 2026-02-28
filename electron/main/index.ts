@@ -15,6 +15,8 @@ import { warmupNetworkOptimization } from '../utils/uv-env';
 
 import { ClawHubService } from '../gateway/clawhub';
 import { ensureClawXContext, repairClawXOnlyBootstrapFiles } from '../utils/openclaw-workspace';
+import { getAllProviders, saveProvider, setDefaultProvider } from '../utils/secure-storage';
+import { saveProviderKeyToOpenClaw } from '../utils/openclaw-auth';
 
 // Disable GPU acceleration for better compatibility
 app.disableHardwareAcceleration();
@@ -24,6 +26,70 @@ let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;
 const gatewayManager = new GatewayManager();
 const clawHubService = new ClawHubService();
+
+/**
+ * Auto-detect local Ollama and register as provider if not already configured.
+ * Runs silently after Gateway startup — never blocks or throws to UI.
+ */
+async function autoDetectOllama(): Promise<void> {
+  // 1. Probe Ollama API
+  let tagsData: { models?: Array<{ name: string }> };
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const res = await fetch('http://localhost:11434/api/tags', {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return;
+    tagsData = await res.json() as typeof tagsData;
+  } catch {
+    // Ollama not running — silently skip
+    return;
+  }
+
+  // 2. Check if Ollama provider already exists
+  const existing = await getAllProviders();
+  if (existing.some((p) => p.type === 'ollama')) {
+    logger.debug('Ollama provider already configured, skipping auto-detect');
+    return;
+  }
+
+  // 3. Pick first available model
+  const models = tagsData?.models ?? [];
+  const firstModel = models.length > 0 ? models[0].name : '';
+
+  // 4. Register Ollama provider
+  const providerId = `ollama-${Date.now()}`;
+  await saveProvider({
+    id: providerId,
+    name: 'Ollama (Auto-detected)',
+    type: 'ollama',
+    baseUrl: 'http://localhost:11434',
+    model: firstModel,
+    enabled: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  // 5. Write to OpenClaw config so gateway can use it
+  try {
+    saveProviderKeyToOpenClaw('ollama', '');
+  } catch (err) {
+    logger.warn('Failed to write Ollama to OpenClaw config:', err);
+  }
+
+  // 6. If no default provider yet, set Ollama as default
+  const hasDefault = existing.length > 0;
+  if (!hasDefault) {
+    await setDefaultProvider(providerId);
+  }
+
+  logger.info(`Ollama auto-detected and registered (model=${firstModel}, models=${models.length})`);
+
+  // 7. Notify frontend to refresh provider list
+  mainWindow?.webContents.send('providers:changed');
+}
 
 /**
  * Resolve the icons directory path (works in both dev and packaged mode)
@@ -192,6 +258,11 @@ async function initialize(): Promise<void> {
     logger.debug('Auto-starting Gateway...');
     await gatewayManager.start();
     logger.info('Gateway auto-start succeeded');
+
+    // Auto-detect local Ollama and register if not already configured
+    autoDetectOllama().catch((err) => {
+      logger.debug('Ollama auto-detect skipped:', err);
+    });
   } catch (error) {
     logger.error('Gateway auto-start failed:', error);
     mainWindow?.webContents.send('gateway:error', String(error));
