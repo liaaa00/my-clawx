@@ -208,7 +208,6 @@ export function ProvidersSettings() {
       {/* Add Provider Dialog */}
       {showAddDialog && (
         <AddProviderDialog
-          existingTypes={new Set(providers.map((p) => p.type))}
           onClose={() => setShowAddDialog(false)}
           onAdd={handleAddProvider}
           onValidateKey={(type, key, options) => validateApiKey(type, key, options)}
@@ -584,7 +583,6 @@ function ProviderCard({
 }
 
 interface AddProviderDialogProps {
-  existingTypes: Set<string>;
   onClose: () => void;
   onAdd: (
     type: ProviderType,
@@ -599,7 +597,7 @@ interface AddProviderDialogProps {
   ) => Promise<{ valid: boolean; error?: string }>;
 }
 
-function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: AddProviderDialogProps) {
+function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogProps) {
   const { t } = useTranslation('settings');
   const [selectedType, setSelectedType] = useState<ProviderType | null>(null);
   const [name, setName] = useState('');
@@ -754,10 +752,8 @@ function AddProviderDialog({ existingTypes, onClose, onAdd, onValidateKey }: Add
     return () => clearTimeout(timer);
   }, [baseUrl, apiKey, selectedType]);
 
-  // Only custom can be added multiple times.
-  const availableTypes = PROVIDER_TYPE_INFO.filter(
-    (t) => t.id === 'custom' || !existingTypes.has(t.id),
-  );
+  // All provider types are available — multiple instances of the same type are supported
+  const availableTypes = PROVIDER_TYPE_INFO;
 
   const handleAdd = async () => {
     if (!selectedType) return;
