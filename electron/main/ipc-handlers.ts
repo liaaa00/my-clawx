@@ -834,13 +834,14 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       // Store the API key if provided
       if (apiKey) {
         await storeApiKey(config.id, apiKey);
+      }
 
-        // Also write to OpenClaw auth-profiles.json so the gateway can use it
-        try {
-          saveProviderKeyToOpenClaw(config.type, apiKey);
-        } catch (err) {
-          console.warn('Failed to save key to OpenClaw auth-profiles:', err);
-        }
+      // Always call saveProviderKeyToOpenClaw, even if apiKey is empty.
+      // openclaw-auth.ts handles 'ollama' or handles OAUTH securely.
+      try {
+        saveProviderKeyToOpenClaw(config.type, apiKey || '');
+      } catch (err) {
+        console.warn('Failed to save key to OpenClaw auth-profiles:', err);
       }
 
       return { success: true };
@@ -924,7 +925,12 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
             saveProviderKeyToOpenClaw(nextConfig.type, trimmedKey);
           } else {
             await deleteApiKey(providerId);
-            removeProviderFromOpenClaw(nextConfig.type);
+            // Ollama does not need a key, so we should save a placeholder instead of removing the auth profile.
+            if (nextConfig.type === 'ollama') {
+              saveProviderKeyToOpenClaw(nextConfig.type, '');
+            } else {
+              removeProviderFromOpenClaw(nextConfig.type);
+            }
           }
         }
 
