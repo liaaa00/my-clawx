@@ -226,7 +226,27 @@ export async function getAllProvidersWithKeyInfo(): Promise<
     // (e.g. wiped by Gateway due to missing plugin, or manually deleted by user)
     // we should remove it from ClawX UI to stay consistent.
     const isBuiltin = (OpenClawBuiltinList as readonly string[]).includes(provider.type);
-    if (!isBuiltin && !activeOpenClawProviders.has(provider.type) && !activeOpenClawProviders.has(provider.id)) {
+
+    // Some builtin providers don't need to be defined in openclaw.json `providers` block
+    // but they are still fully supported and shouldn't be dropped.
+    // E.g., 'aliyun-coding', 'zhipu-coding', 'moonshot', 'siliconflow' etc.
+    const ALWAYS_KEEP = [
+      'custom',
+      'ollama',
+      'aliyun-coding',
+      'zhipu-coding',
+      'moonshot',
+      'siliconflow',
+      'deepseek',
+      'gemini',
+      'anthropic',
+      'openai',
+      'openrouter',
+    ];
+
+    const shouldKeep = isBuiltin || ALWAYS_KEEP.includes(provider.type);
+
+    if (!shouldKeep && !activeOpenClawProviders.has(provider.type) && !activeOpenClawProviders.has(provider.id)) {
       console.log(`[Sync] Provider ${provider.id} (${provider.type}) missing from OpenClaw, dropping from ClawX UI`);
       await deleteProvider(provider.id);
       continue;
