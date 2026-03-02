@@ -180,6 +180,12 @@ export function saveProviderKeyToOpenClaw(
     console.log(`Skipping auth-profiles write for OAuth provider "${provider}" (no API key provided, using OAuth)`);
     return;
   }
+
+  // For providers that don't need an API key (e.g. Ollama), use a placeholder.
+  // OpenClaw's auth system rejects empty keys, but Ollama ignores the
+  // Authorization header entirely, so a placeholder is safe.
+  const LOCAL_NO_KEY_PROVIDERS = ['ollama'];
+  const effectiveKey = apiKey || (LOCAL_NO_KEY_PROVIDERS.includes(provider) ? 'ollama' : apiKey);
   const agentIds = agentId ? [agentId] : discoverAgentIds();
   if (agentIds.length === 0) agentIds.push('main');
 
@@ -193,7 +199,7 @@ export function saveProviderKeyToOpenClaw(
     store.profiles[profileId] = {
       type: 'api_key',
       provider,
-      key: apiKey,
+      key: effectiveKey,
     };
 
     // Update order to include this profile
