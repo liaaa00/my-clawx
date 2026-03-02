@@ -17,6 +17,7 @@ import { ClawHubService } from '../gateway/clawhub';
 import { ensureClawXContext, repairClawXOnlyBootstrapFiles } from '../utils/openclaw-workspace';
 import { getAllProviders, saveProvider, setDefaultProvider } from '../utils/secure-storage';
 import { saveProviderKeyToOpenClaw } from '../utils/openclaw-auth';
+import { startOpenClawConfigWatcher, stopOpenClawConfigWatcher } from '../utils/openclaw-watcher';
 
 // Disable GPU acceleration for better compatibility
 app.disableHardwareAcceleration();
@@ -263,6 +264,9 @@ async function initialize(): Promise<void> {
     autoDetectOllama().catch((err) => {
       logger.debug('Ollama auto-detect skipped:', err);
     });
+
+    // Watch openclaw.json for external changes (e.g. Agent via config.patch)
+    startOpenClawConfigWatcher(mainWindow);
   } catch (error) {
     logger.error('Gateway auto-start failed:', error);
     mainWindow?.webContents.send('gateway:error', String(error));
@@ -301,6 +305,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  stopOpenClawConfigWatcher();
   // Fire-and-forget: do not await gatewayManager.stop() here.
   // Awaiting inside before-quit can stall Electron's quit sequence.
   void gatewayManager.stop().catch((err) => {
