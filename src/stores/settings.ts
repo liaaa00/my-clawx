@@ -7,11 +7,13 @@ import { persist } from 'zustand/middleware';
 import i18n from '@/i18n';
 
 type Theme = 'light' | 'dark' | 'system';
+type FontSize = 'small' | 'medium' | 'large';
 type UpdateChannel = 'stable' | 'beta' | 'dev';
 
 interface SettingsState {
   // General
   theme: Theme;
+  fontSize: FontSize;
   language: string;
   startMinimized: boolean;
   launchAtStartup: boolean;
@@ -34,6 +36,7 @@ interface SettingsState {
 
   // Actions
   setTheme: (theme: Theme) => void;
+  setFontSize: (size: FontSize) => void;
   setLanguage: (language: string) => void;
   setStartMinimized: (value: boolean) => void;
   setLaunchAtStartup: (value: boolean) => void;
@@ -51,6 +54,7 @@ interface SettingsState {
 
 const defaultSettings = {
   theme: 'system' as Theme,
+  fontSize: 'medium' as FontSize,
   language: (() => {
     const lang = navigator.language.toLowerCase();
     if (lang.startsWith('zh')) return 'zh';
@@ -75,6 +79,7 @@ export const useSettingsStore = create<SettingsState>()(
       ...defaultSettings,
 
       setTheme: (theme) => set({ theme }),
+      setFontSize: (fontSize) => set({ fontSize }),
       setLanguage: (language) => { i18n.changeLanguage(language); set({ language }); },
       setStartMinimized: (startMinimized) => set({ startMinimized }),
       setLaunchAtStartup: (launchAtStartup) => set({ launchAtStartup }),

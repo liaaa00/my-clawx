@@ -22,7 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useProviderStore, type ProviderConfig, type ProviderWithKeyInfo } from '@/stores/providers';
@@ -804,15 +804,20 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>{t('aiProviders.dialog.title')}</CardTitle>
-          <CardDescription>
-            {t('aiProviders.dialog.desc')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto flex flex-col rounded-xl border border-border/50 bg-card shadow-2xl">
+        <div className="flex items-start justify-between p-6 pb-2">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">{t('aiProviders.dialog.title')}</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              {t('aiProviders.dialog.desc')}
+            </p>
+          </div>
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 -mr-2 -mt-2 shrink-0">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="p-6 space-y-4 pt-4">
           {!selectedType ? (
             <div className="grid grid-cols-2 gap-3">
               {availableTypes.map((type) => (
@@ -1095,8 +1100,8 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
               {t('aiProviders.dialog.add')}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

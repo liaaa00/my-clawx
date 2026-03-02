@@ -75,7 +75,7 @@ export const ChatMessage = memo(function ChatMessage({
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full mt-1',
           isUser
             ? 'bg-primary text-primary-foreground'
-            : 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white',
+            : 'bg-foreground text-background',
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}

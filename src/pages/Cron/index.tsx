@@ -24,7 +24,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+// Card imports removed as part of UI refactor
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
@@ -150,17 +150,17 @@ function TaskDialog({ job, onClose, onSave }: TaskDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto border-border/50 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="flex flex-row items-start justify-between pb-4">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto flex flex-col rounded-xl border border-border/50 bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-row items-start justify-between p-6 pb-2">
           <div>
-            <CardTitle className="text-lg">{job ? t('dialog.editTitle') : t('dialog.createTitle')}</CardTitle>
-            <CardDescription>{t('dialog.description')}</CardDescription>
+            <h2 className="text-xl font-bold tracking-tight">{job ? t('dialog.editTitle') : t('dialog.createTitle')}</h2>
+            <p className="text-sm text-muted-foreground mt-1">{t('dialog.description')}</p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 -mr-2 -mt-2">
             <X className="h-4 w-4" />
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-5">
+        </div>
+        <div className="p-6 space-y-5">
           {/* Name */}
           <div className="space-y-1.5">
             <Label htmlFor="name" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{t('dialog.taskName')}</Label>
@@ -249,8 +249,8 @@ function TaskDialog({ job, onClose, onSave }: TaskDialogProps) {
               {saving ? <><Loader2 className="h-4 w-4 mr-1.5 animate-spin" />Saving...</> : <><CheckCircle2 className="h-4 w-4 mr-1.5" />{job && job.id ? t('dialog.saveChanges') : t('dialog.createTitle')}</>}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }

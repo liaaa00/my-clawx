@@ -88,6 +88,7 @@ function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useSettingsStore((state) => state.theme);
+  const fontSize = useSettingsStore((state) => state.fontSize);
   const language = useSettingsStore((state) => state.language);
   const setupComplete = useSettingsStore((state) => state.setupComplete);
   const initGateway = useGatewayStore((state) => state.init);
@@ -143,6 +144,18 @@ function App() {
       root.classList.add(theme);
     }
   }, [theme]);
+
+  // Apply font size
+  useEffect(() => {
+    const root = window.document.documentElement;
+    if (fontSize === 'small') {
+      root.style.fontSize = '14px';
+    } else if (fontSize === 'large') {
+      root.style.fontSize = '18px';
+    } else {
+      root.style.fontSize = '16px';
+    }
+  }, [fontSize]);
 
   return (
     <ErrorBoundary>

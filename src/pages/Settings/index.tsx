@@ -2,7 +2,7 @@
  * Settings Page
  * Application configuration
  */
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   Sun,
   Moon,
@@ -10,18 +10,16 @@ import {
   RefreshCw,
   Terminal,
   ExternalLink,
-  Key,
   Download,
   Copy,
   FileText,
+  Settings as SettingsIcon,
+  X as XIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { useSettingsStore } from '@/stores/settings';
 import { useGatewayStore } from '@/stores/gateway';
@@ -30,25 +28,20 @@ import { ProvidersSettings } from '@/components/settings/ProvidersSettings';
 import { UpdateSettings } from '@/components/settings/UpdateSettings';
 import { useTranslation } from 'react-i18next';
 import { SUPPORTED_LANGUAGES } from '@/i18n';
-type ControlUiInfo = {
-  url: string;
-  token: string;
-  port: number;
-};
+import { cn } from '@/lib/utils';
+
 
 export function Settings() {
   const { t } = useTranslation('settings');
   const {
     theme,
     setTheme,
+    fontSize,
+    setFontSize,
     language,
     setLanguage,
     gatewayAutoStart,
     setGatewayAutoStart,
-    autoCheckUpdate,
-    setAutoCheckUpdate,
-    autoDownloadUpdate,
-    setAutoDownloadUpdate,
     devModeUnlocked,
     setDevModeUnlocked,
     resetSetup,
@@ -56,17 +49,6 @@ export function Settings() {
 
   const { status: gatewayStatus, restart: restartGateway } = useGatewayStore();
   const currentVersion = useUpdateStore((state) => state.currentVersion);
-  const updateSetAutoDownload = useUpdateStore((state) => state.setAutoDownload);
-  const [controlUiInfo, setControlUiInfo] = useState<ControlUiInfo | null>(null);
-  const [openclawCliCommand, setOpenclawCliCommand] = useState('');
-  const [openclawCliError, setOpenclawCliError] = useState<string | null>(null);
-  const [installingCli, setInstallingCli] = useState(false);
-
-  const isMac = window.electron.platform === 'darwin';
-  const isWindows = window.electron.platform === 'win32';
-  const isLinux = window.electron.platform === 'linux';
-  const isDev = window.electron.isDev;
-  const showCliTools = isMac || isWindows || isLinux;
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
 
@@ -103,7 +85,6 @@ export function Settings() {
         error?: string;
       };
       if (result.success && result.url && result.token && typeof result.port === 'number') {
-        setControlUiInfo({ url: result.url, token: result.token, port: result.port });
         window.electron.openExternal(result.url);
       } else {
         console.error('Failed to get Dev Console URL:', result.error);
@@ -113,481 +94,188 @@ export function Settings() {
     }
   };
 
-  const refreshControlUiInfo = async () => {
-    try {
-      const result = await window.electron.ipcRenderer.invoke('gateway:getControlUiUrl') as {
-        success: boolean;
-        url?: string;
-        token?: string;
-        port?: number;
-      };
-      if (result.success && result.url && result.token && typeof result.port === 'number') {
-        setControlUiInfo({ url: result.url, token: result.token, port: result.port });
-      }
-    } catch {
-      // Ignore refresh errors
-    }
-  };
-
-  const handleCopyGatewayToken = async () => {
-    if (!controlUiInfo?.token) return;
-    try {
-      await navigator.clipboard.writeText(controlUiInfo.token);
-      toast.success(t('developer.tokenCopied'));
-    } catch (error) {
-      toast.error(`Failed to copy token: ${String(error)}`);
-    }
-  };
-
-  useEffect(() => {
-    if (!showCliTools) return;
-    let cancelled = false;
-
-    const loadCliCommand = async () => {
-      try {
-        const result = await window.electron.ipcRenderer.invoke('openclaw:getCliCommand') as {
-          success: boolean;
-          command?: string;
-          error?: string;
-        };
-        if (cancelled) return;
-        if (result.success && result.command) {
-          setOpenclawCliCommand(result.command);
-          setOpenclawCliError(null);
-        } else {
-          setOpenclawCliCommand('');
-          setOpenclawCliError(result.error || 'OpenClaw CLI unavailable');
-        }
-      } catch (error) {
-        if (cancelled) return;
-        setOpenclawCliCommand('');
-        setOpenclawCliError(String(error));
-      }
-    };
-
-    loadCliCommand();
-    return () => {
-      cancelled = true;
-    };
-  }, [devModeUnlocked, showCliTools]);
-
-  const handleCopyCliCommand = async () => {
-    if (!openclawCliCommand) return;
-    try {
-      await navigator.clipboard.writeText(openclawCliCommand);
-      toast.success(t('developer.cmdCopied'));
-    } catch (error) {
-      toast.error(`Failed to copy command: ${String(error)}`);
-    }
-  };
-
-  const handleInstallCliCommand = async () => {
-    if (!isMac || installingCli) return;
-    try {
-      const confirmation = await window.electron.ipcRenderer.invoke('dialog:message', {
-        type: 'question',
-        title: t('developer.installTitle'),
-        message: t('developer.installMessage'),
-        detail: t('developer.installDetail'),
-        buttons: ['Cancel', 'Install'],
-        defaultId: 1,
-        cancelId: 0,
-      }) as { response: number };
-
-      if (confirmation.response !== 1) return;
-
-      setInstallingCli(true);
-      const result = await window.electron.ipcRenderer.invoke('openclaw:installCliMac') as {
-        success: boolean;
-        path?: string;
-        error?: string;
-      };
-
-      if (result.success) {
-        toast.success(`Installed command at ${result.path ?? '/usr/local/bin/openclaw'}`);
-      } else {
-        toast.error(result.error || 'Failed to install command');
-      }
-    } catch (error) {
-      toast.error(`Install failed: ${String(error)}`);
-    } finally {
-      setInstallingCli(false);
-    }
-  };
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">{t('title')}</h1>
-        <p className="text-muted-foreground">
-          {t('subtitle')}
-        </p>
+    <div className="space-y-8 pb-12">
+      <div className="flex items-center gap-2 mb-2">
+        <SettingsIcon className="h-5 w-5 text-foreground/80" />
+        <h1 className="text-2xl font-bold tracking-tight">{t('title')}</h1>
       </div>
 
-      {/* Appearance */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('appearance.title')}</CardTitle>
-          <CardDescription>{t('appearance.description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>{t('appearance.theme')}</Label>
-            <div className="flex gap-2">
-              <Button
-                variant={theme === 'light' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme('light')}
-              >
-                <Sun className="h-4 w-4 mr-2" />
-                {t('appearance.light')}
-              </Button>
-              <Button
-                variant={theme === 'dark' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme('dark')}
-              >
-                <Moon className="h-4 w-4 mr-2" />
-                {t('appearance.dark')}
-              </Button>
-              <Button
-                variant={theme === 'system' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setTheme('system')}
-              >
-                <Monitor className="h-4 w-4 mr-2" />
-                {t('appearance.system')}
-              </Button>
+      {/* --- Appearance --- */}
+      <section className="space-y-4">
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('appearance.title')}</h2>
+        <div className="rounded-xl border border-border/50 bg-card/30 p-4 space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">{t('appearance.theme')}</Label>
+              <p className="text-xs text-muted-foreground">{t('appearance.themeDesc')}</p>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label>{t('appearance.language')}</Label>
-            <div className="flex gap-2">
-              {SUPPORTED_LANGUAGES.map((lang) => (
+            <div className="flex items-center rounded-lg border border-border/60 bg-muted/20 p-1">
+              {[
+                { value: 'light', icon: Sun },
+                { value: 'dark', icon: Moon },
+                { value: 'system', icon: Monitor },
+              ].map((m) => (
                 <Button
-                  key={lang.code}
-                  variant={language === lang.code ? 'default' : 'outline'}
+                  key={m.value}
+                  variant={theme === m.value ? 'secondary' : 'ghost'}
                   size="sm"
-                  onClick={() => setLanguage(lang.code)}
+                  className={cn('h-8 w-10 px-0 transition-all', theme === m.value && 'bg-background shadow-sm')}
+                  onClick={() => setTheme(m.value as any)}
                 >
-                  {lang.label}
+                  <m.icon className="h-4 w-4" />
                 </Button>
               ))}
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* AI Providers */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Key className="h-5 w-5" />
-            {t('aiProviders.title')}
-          </CardTitle>
-          <CardDescription>{t('aiProviders.description')}</CardDescription>
-        </CardHeader>
-        <CardContent>
+          <Separator className="bg-border/40" />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">{t('appearance.language')}</Label>
+              <p className="text-xs text-muted-foreground">{t('appearance.languageDesc')}</p>
+            </div>
+            <select
+              value={language}
+              onChange={(e) => setLanguage(e.target.value)}
+              className="h-9 w-[160px] rounded-lg border border-border/60 bg-muted/20 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring/20"
+            >
+              {SUPPORTED_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>{lang.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <Separator className="bg-border/40" />
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">{t('appearance.fontSize', 'UI 缩放 / 字体大小')}</Label>
+              <p className="text-xs text-muted-foreground">{t('appearance.fontSizeDesc', '调整应用界面的整体文字与布局大小')}</p>
+            </div>
+            <select
+              value={fontSize}
+              onChange={(e) => setFontSize(e.target.value as any)}
+              className="h-9 w-[160px] rounded-lg border border-border/60 bg-muted/20 px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring/20"
+            >
+              <option value="small">{t('appearance.fontSizeSmall', '小 (Small)')}</option>
+              <option value="medium">{t('appearance.fontSizeMedium', '中 (Medium)')}</option>
+              <option value="large">{t('appearance.fontSizeLarge', '大 (Large)')}</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* --- Providers --- */}
+      <section className="space-y-4">
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('aiProviders.title')}</h2>
+        <div className="rounded-xl border border-border/50 bg-card/30 p-5">
           <ProvidersSettings />
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* Gateway */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('gateway.title')}</CardTitle>
-          <CardDescription>{t('gateway.description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* --- Gateway --- */}
+      <section className="space-y-4">
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('gateway.title')}</h2>
+        <div className="rounded-xl border border-border/50 bg-card/30 p-4 space-y-5">
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">{t('gateway.autoStart')}</Label>
+              <p className="text-xs text-muted-foreground">{t('gateway.autoStartDesc')}</p>
+            </div>
+            <Switch checked={gatewayAutoStart} onCheckedChange={setGatewayAutoStart} />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3 border border-border/40">
+            <div className="flex items-center gap-3">
+              <div className={cn('h-3 w-3 rounded-full', gatewayStatus.state === 'running' ? 'bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-muted-foreground/30')} />
+              <div className="space-y-0.5">
+                <p className="text-xs font-semibold uppercase tracking-tight">{t('gateway.status')}: {gatewayStatus.state.toUpperCase()}</p>
+                {gatewayStatus.port && <p className="text-[10px] text-muted-foreground">Port {gatewayStatus.port} · PID {gatewayStatus.pid || '—'}</p>}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs font-medium" onClick={restartGateway}>
+              <RefreshCw className="h-3 w-3 mr-1.5" />
+              {t('common:actions.restart')}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* --- Advanced/Dev Tools --- */}
+      <section className="space-y-4">
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('advanced.title')}</h2>
+        <div className="rounded-xl border border-border/50 bg-card/30 p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label>{t('gateway.status')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('gateway.port')}: {gatewayStatus.port}
-              </p>
+              <Label className="text-sm font-medium">{t('advanced.devMode')}</Label>
+              <p className="text-xs text-muted-foreground">{t('advanced.devModeDesc')}</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Badge
-                variant={
-                  gatewayStatus.state === 'running'
-                    ? 'success'
-                    : gatewayStatus.state === 'error'
-                      ? 'destructive'
-                      : 'secondary'
-                }
-              >
-                {gatewayStatus.state}
-              </Badge>
-              <Button variant="outline" size="sm" onClick={restartGateway}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                {t('common:actions.restart')}
+            <Switch checked={devModeUnlocked} onCheckedChange={setDevModeUnlocked} />
+          </div>
+
+          {devModeUnlocked && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-2">
+              <Button variant="outline" className="justify-start gap-2 h-9 text-xs" onClick={openDevConsole}>
+                <Terminal className="h-3.5 w-3.5" />
+                {t('developer.openConsole')}
+                <ExternalLink className="h-3 w-3 ml-auto opacity-40" />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleShowLogs}>
-                <FileText className="h-4 w-4 mr-2" />
+              <Button variant="outline" className="justify-start gap-2 h-9 text-xs" onClick={handleShowLogs}>
+                <FileText className="h-3.5 w-3.5" />
                 {t('gateway.logs')}
               </Button>
-            </div>
-          </div>
-
-          {showLogs && (
-            <div className="mt-4 p-4 rounded-lg bg-black/10 dark:bg-black/40 border border-border">
-              <div className="flex items-center justify-between mb-2">
-                <p className="font-medium text-sm">{t('gateway.appLogs')}</p>
-                <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={handleOpenLogDir}>
-                    <ExternalLink className="h-3 w-3 mr-1" />
-                    {t('gateway.openFolder')}
-                  </Button>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowLogs(false)}>
-                    {t('common:actions.close')}
-                  </Button>
-                </div>
-              </div>
-              <pre className="text-xs text-muted-foreground bg-background/50 p-3 rounded max-h-60 overflow-auto whitespace-pre-wrap font-mono">
-                {logContent || t('chat:noLogs')}
-              </pre>
+              <Button variant="outline" className="justify-start gap-2 h-9 text-xs" onClick={handleOpenLogDir}>
+                <Download className="h-3.5 w-3.5" />
+                {t('gateway.openFolder')}
+              </Button>
+              <Button variant="destructive" className="justify-start gap-2 h-9 text-xs" onClick={() => { resetSetup(); toast.success("Setup wizard reset!"); }}>
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reset Wizard
+              </Button>
             </div>
           )}
+        </div>
+      </section>
 
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>{t('gateway.autoStart')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('gateway.autoStartDesc')}
-              </p>
-            </div>
-            <Switch
-              checked={gatewayAutoStart}
-              onCheckedChange={setGatewayAutoStart}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Updates */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Download className="h-5 w-5" />
-            {t('updates.title')}
-          </CardTitle>
-          <CardDescription>{t('updates.description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      {/* --- Updates --- */}
+      <section className="space-y-4">
+        <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('updates.title')}</h2>
+        <div className="rounded-xl border border-border/50 bg-card/30 p-5">
           <UpdateSettings />
-
-          <Separator />
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>{t('updates.autoCheck')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('updates.autoCheckDesc')}
-              </p>
-            </div>
-            <Switch
-              checked={autoCheckUpdate}
-              onCheckedChange={setAutoCheckUpdate}
-            />
+          <div className="mt-4 pt-4 border-t border-border/40 text-[10px] text-muted-foreground flex justify-between items-center">
+            <span>Easy-claw v{currentVersion}</span>
+            <span>© 2026 iaaa00</span>
           </div>
+        </div>
+      </section>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>{t('updates.autoDownload')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('updates.autoDownloadDesc')}
-              </p>
+      {/* Logs Dialog */}
+      {showLogs && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-4xl max-h-[85vh] flex flex-col rounded-xl border border-border/50 bg-card shadow-2xl overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b bg-card">
+              <h3 className="text-xs font-bold uppercase tracking-wider">Application Logs</h3>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowLogs(false)}><XIcon className="h-4 w-4" /></Button>
             </div>
-            <Switch
-              checked={autoDownloadUpdate}
-              onCheckedChange={(value) => {
-                setAutoDownloadUpdate(value);
-                updateSetAutoDownload(value);
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Advanced */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('advanced.title')}</CardTitle>
-          <CardDescription>{t('advanced.description')}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>{t('advanced.devMode')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('advanced.devModeDesc')}
-              </p>
-            </div>
-            <Switch
-              checked={devModeUnlocked}
-              onCheckedChange={setDevModeUnlocked}
-            />
-          </div>
-          <Separator />
-          <div className="flex items-center justify-between">
-            <div>
-              <Label>Reset Setup Wizard</Label>
-              <p className="text-sm text-muted-foreground">
-                Resets the application to its first-launch state.
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                resetSetup();
-                toast.success("Setup wizard reset! Please restart the app.");
-              }}
-            >
-              Reset Wizard
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Developer */}
-      {devModeUnlocked && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('developer.title')}</CardTitle>
-            <CardDescription>{t('developer.description')}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>{t('developer.console')}</Label>
-              <p className="text-sm text-muted-foreground">
-                {t('developer.consoleDesc')}
-              </p>
-              <Button variant="outline" onClick={openDevConsole}>
-                <Terminal className="h-4 w-4 mr-2" />
-                {t('developer.openConsole')}
-                <ExternalLink className="h-3 w-3 ml-2" />
+            <pre className="flex-1 overflow-auto p-4 text-[11px] font-mono leading-relaxed bg-muted/20">
+              {logContent || t('chat:noLogs')}
+            </pre>
+            <div className="p-3 border-t bg-card/50 flex justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-[11px]"
+                onClick={() => { navigator.clipboard.writeText(logContent); toast.success('Logs copied'); }}
+              >
+                <Copy className="h-3 w-3 mr-1.5" /> Copy to Clipboard
               </Button>
-              <p className="text-xs text-muted-foreground">
-                {t('developer.consoleNote')}
-              </p>
-              <div className="space-y-2 pt-2">
-                <Label>{t('developer.gatewayToken')}</Label>
-                <p className="text-sm text-muted-foreground">
-                  {t('developer.gatewayTokenDesc')}
-                </p>
-                <div className="flex gap-2">
-                  <Input
-                    readOnly
-                    value={controlUiInfo?.token || ''}
-                    placeholder={t('developer.tokenUnavailable')}
-                    className="font-mono"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={refreshControlUiInfo}
-                    disabled={!devModeUnlocked}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {t('common:actions.load')}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCopyGatewayToken}
-                    disabled={!controlUiInfo?.token}
-                  >
-                    <Copy className="h-4 w-4 mr-2" />
-                    {t('common:actions.copy')}
-                  </Button>
-                </div>
-              </div>
             </div>
-            {showCliTools && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <Label>{t('developer.cli')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('developer.cliDesc')}
-                  </p>
-                  {isWindows && (
-                    <p className="text-xs text-muted-foreground">
-                      {t('developer.cliPowershell')}
-                    </p>
-                  )}
-                  <div className="flex gap-2">
-                    <Input
-                      readOnly
-                      value={openclawCliCommand}
-                      placeholder={openclawCliError || t('developer.cmdUnavailable')}
-                      className="font-mono"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleCopyCliCommand}
-                      disabled={!openclawCliCommand}
-                    >
-                      <Copy className="h-4 w-4 mr-2" />
-                      {t('common:actions.copy')}
-                    </Button>
-                  </div>
-                  {isMac && !isDev && (
-                    <div className="space-y-1">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleInstallCliCommand}
-                        disabled={installingCli}
-                      >
-                        <Terminal className="h-4 w-4 mr-2" />
-                        {t('developer.installCmd')}
-                      </Button>
-                      <p className="text-xs text-muted-foreground">
-                        {t('developer.installCmdDesc')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* About */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('about.title')}</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            <strong>{t('about.appName')}</strong> - {t('about.tagline')}
-          </p>
-          <p>{t('about.basedOn')}</p>
-          <p>{t('about.version', { version: currentVersion })}</p>
-          <div className="flex gap-4 pt-2">
-            <Button
-              variant="link"
-              className="h-auto p-0"
-              onClick={() => window.electron.openExternal('https://claw-x.com')}
-            >
-              {t('about.docs')}
-            </Button>
-            <Button
-              variant="link"
-              className="h-auto p-0"
-              onClick={() => window.electron.openExternal('https://github.com/ValueCell-ai/ClawX')}
-            >
-              {t('about.github')}
-            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

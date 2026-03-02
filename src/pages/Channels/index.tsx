@@ -25,7 +25,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { useChannelsStore } from '@/stores/channels';
@@ -44,6 +44,7 @@ import {
 } from '@/types/channel';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
+import { cn } from '@/lib/utils';
 
 export function Channels() {
   const { t } = useTranslation('channels');
@@ -129,45 +130,42 @@ export function Channels() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="rounded-full bg-primary/10 p-3">
-                <Radio className="h-6 w-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{channels.length}</p>
-                <p className="text-sm text-muted-foreground">{t('stats.total')}</p>
-              </div>
+        {/* Total */}
+        <div className="rounded-xl border border-border/50 bg-card/30 p-5">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-primary/10 p-2.5">
+              <Radio className="h-5 w-5 text-primary" />
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="rounded-full bg-green-100 p-3 dark:bg-green-900">
-                <Power className="h-6 w-6 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{connectedCount}</p>
-                <p className="text-sm text-muted-foreground">{t('stats.connected')}</p>
-              </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('stats.total')}</p>
+              <p className="text-2xl font-bold font-mono tracking-tight">{channels.length}</p>
             </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="rounded-full bg-slate-100 p-3 dark:bg-slate-800">
-                <PowerOff className="h-6 w-6 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{channels.length - connectedCount}</p>
-                <p className="text-sm text-muted-foreground">{t('stats.disconnected')}</p>
-              </div>
+          </div>
+        </div>
+        {/* Connected */}
+        <div className="rounded-xl border border-border/50 bg-card/30 p-5">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-green-500/10 p-2.5">
+              <Power className="h-5 w-5 text-green-600 dark:text-green-500" />
             </div>
-          </CardContent>
-        </Card>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('stats.connected')}</p>
+              <p className="text-2xl font-bold font-mono tracking-tight">{connectedCount}</p>
+            </div>
+          </div>
+        </div>
+        {/* Disconnected */}
+        <div className="rounded-xl border border-border/50 bg-card/30 p-5">
+          <div className="flex items-center gap-4">
+            <div className="rounded-full bg-muted p-2.5">
+              <PowerOff className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('stats.disconnected')}</p>
+              <p className="text-2xl font-bold font-mono tracking-tight">{channels.length - connectedCount}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Gateway Warning */}
@@ -193,76 +191,71 @@ export function Channels() {
 
       {/* Configured Channels */}
       {channels.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('configured')}</CardTitle>
-            <CardDescription>{t('configuredDesc')}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {channels.map((channel) => (
-                <ChannelCard
-                  key={channel.id}
-                  channel={channel}
-                  onDelete={() => {
-                    if (confirm(t('deleteConfirm'))) {
-                      deleteChannel(channel.id);
-                    }
-                  }}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <section className="space-y-4">
+          <div className="space-y-1">
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('configured')}</h2>
+            <p className="text-xs text-muted-foreground">{t('configuredDesc')}</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {channels.map((channel) => (
+              <ChannelCard
+                key={channel.id}
+                channel={channel}
+                onDelete={() => {
+                  if (confirm(t('deleteConfirm'))) {
+                    deleteChannel(channel.id);
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </section>
       )}
 
       {/* Available Channels */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>{t('available')}</CardTitle>
-              <CardDescription>
-                {t('availableDesc')}
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {displayedChannelTypes.map((type) => {
-              const meta = CHANNEL_META[type];
-              const isConfigured = configuredTypes.includes(type);
-              return (
-                <button
-                  key={type}
-                  className={`p-4 rounded-lg border hover:bg-accent transition-colors text-left relative ${isConfigured ? 'border-green-500/50 bg-green-500/5' : ''}`}
-                  onClick={() => {
-                    setSelectedChannelType(type);
-                    setShowAddDialog(true);
-                  }}
-                >
-                  <span className="text-3xl">{meta.icon}</span>
-                  <p className="font-medium mt-2">{meta.name}</p>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {meta.description}
-                  </p>
+      <section className="space-y-4 pb-8">
+        <div className="space-y-1">
+          <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">{t('available')}</h2>
+          <p className="text-xs text-muted-foreground">{t('availableDesc')}</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {displayedChannelTypes.map((type) => {
+            const meta = CHANNEL_META[type];
+            const isConfigured = configuredTypes.includes(type);
+            return (
+              <button
+                key={type}
+                className={cn(
+                  "p-5 rounded-xl border border-border/50 bg-card/30 hover:bg-muted/50 transition-all text-left relative flex flex-col group",
+                  isConfigured && "border-green-500/30 bg-green-500/5 hover:bg-green-500/10"
+                )}
+                onClick={() => {
+                  setSelectedChannelType(type);
+                  setShowAddDialog(true);
+                }}
+              >
+                <div className="flex items-center justify-between w-full mb-3">
+                  <span className="text-2xl transition-transform group-hover:scale-110">{meta.icon}</span>
                   {isConfigured && (
-                    <Badge className="absolute top-2 right-2 text-xs bg-green-600 hover:bg-green-600">
+                    <Badge variant="outline" className="text-[9px] border-green-500/30 text-green-600 bg-green-500/10 uppercase tracking-tight py-0">
                       {t('configuredBadge')}
                     </Badge>
                   )}
                   {!isConfigured && meta.isPlugin && (
-                    <Badge variant="secondary" className="absolute top-2 right-2 text-xs">
+                    <Badge variant="secondary" className="text-[9px] uppercase tracking-tight py-0">
                       {t('pluginBadge')}
                     </Badge>
                   )}
-                </button>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+                </div>
+                <p className="text-sm font-semibold tracking-tight">{meta.name}</p>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
+                  {meta.description}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Add Channel Dialog */}
       {showAddDialog && (
@@ -294,39 +287,41 @@ interface ChannelCardProps {
 
 function ChannelCard({ channel, onDelete }: ChannelCardProps) {
   return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">
-              {CHANNEL_ICONS[channel.type]}
-            </span>
-            <div>
-              <CardTitle className="text-base">{channel.name}</CardTitle>
-              <CardDescription className="text-xs">
-                {CHANNEL_NAMES[channel.type]}
-              </CardDescription>
-            </div>
+    <div className="rounded-xl border border-border/50 bg-card/30 p-4 transition-all hover:shadow-sm">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="bg-background rounded-lg p-1.5 shadow-sm border border-border/40 text-xl">
+            {CHANNEL_ICONS[channel.type]}
           </div>
-          <StatusBadge status={channel.status as Status} />
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight">{channel.name}</h3>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wider">
+              {CHANNEL_NAMES[channel.type]}
+            </p>
+          </div>
         </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {channel.error && (
-          <p className="text-xs text-destructive mb-3">{channel.error}</p>
-        )}
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive hover:text-destructive"
-            onClick={onDelete}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <StatusBadge status={channel.status as Status} />
+      </div>
+
+      {channel.error && (
+        <div className="mb-3 px-3 py-2 rounded-md bg-destructive/10 border border-destructive/20 text-[11px] text-destructive leading-tight">
+          {channel.error}
         </div>
-      </CardContent>
-    </Card>
+      )}
+
+      <div className="flex justify-end pt-1 mt-auto border-t border-border/40">
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10 -mr-2"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+          {/* Using literal 'Delete' or t('delete') if available, falling back to icon */}
+          Delete
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -638,28 +633,28 @@ function AddChannelDialog({ selectedType, onSelectType, onClose, onChannelAdded 
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <CardHeader className="flex flex-row items-start justify-between">
-          <div>
-            <CardTitle>
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border/50 bg-card shadow-xl p-6">
+        <div className="flex flex-row items-start justify-between mb-6">
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold tracking-tight">
               {selectedType
                 ? isExistingConfig
                   ? t('dialog.updateTitle', { name: CHANNEL_NAMES[selectedType] })
                   : t('dialog.configureTitle', { name: CHANNEL_NAMES[selectedType] })
                 : t('dialog.addTitle')}
-            </CardTitle>
-            <CardDescription>
+            </h2>
+            <p className="text-sm text-muted-foreground">
               {selectedType && isExistingConfig
                 ? t('dialog.existingDesc')
                 : meta ? t(meta.description) : t('dialog.selectDesc')}
-            </CardDescription>
+            </p>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        </div>
+        <div className="space-y-6">
           {!selectedType ? (
             // Channel type selection
             <div className="grid grid-cols-2 gap-4">
@@ -669,13 +664,15 @@ function AddChannelDialog({ selectedType, onSelectType, onClose, onChannelAdded 
                   <button
                     key={type}
                     onClick={() => onSelectType(type)}
-                    className="p-4 rounded-lg border hover:bg-accent transition-colors text-left"
+                    className="p-4 rounded-xl border border-border/50 bg-card/30 hover:bg-muted/50 transition-all text-left flex flex-col items-center justify-center space-y-2 group"
                   >
-                    <span className="text-3xl">{channelMeta.icon}</span>
-                    <p className="font-medium mt-2">{channelMeta.name}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {channelMeta.connectionType === 'qr' ? t('dialog.qrCode') : t('dialog.token')}
-                    </p>
+                    <span className="text-3xl transition-transform group-hover:scale-110">{channelMeta.icon}</span>
+                    <div className="text-center">
+                      <p className="text-sm font-semibold tracking-tight">{channelMeta.name}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">
+                        {channelMeta.connectionType === 'qr' ? t('dialog.qrCode') : t('dialog.token')}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
@@ -857,8 +854,8 @@ function AddChannelDialog({ selectedType, onSelectType, onClose, onChannelAdded 
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div >
   );
 }

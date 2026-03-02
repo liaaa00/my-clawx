@@ -29,7 +29,7 @@ import {
   FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -159,24 +159,24 @@ function SkillDetailDialog({ skill, onClose, onToggle }: SkillDetailDialogProps)
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={onClose}>
-      <Card className="w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="flex flex-row items-start justify-between pb-2">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-border/50 bg-card shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex flex-row items-start justify-between p-6 pb-2">
           <div className="flex items-center gap-4">
-            <span className="text-4xl">{skill.icon || '🔧'}</span>
+            <span className="text-4xl drop-shadow-sm">{skill.icon || '🔧'}</span>
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
                 {skill.name}
-                {skill.isCore && <Lock className="h-4 w-4 text-muted-foreground" />}
-              </CardTitle>
+                {skill.isCore && <Lock className="h-4 w-4 text-muted-foreground/50" />}
+              </h2>
               <div className="flex gap-2 mt-2">
                 {skill.slug && !skill.isBundled && !skill.isCore && (
                   <>
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={handleOpenClawhub}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 opacity-80 hover:opacity-100" onClick={handleOpenClawhub}>
                       <Globe className="h-3 w-3" />
                       ClawHub
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={handleOpenEditor}>
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 opacity-80 hover:opacity-100" onClick={handleOpenEditor}>
                       <FileCode className="h-3 w-3" />
                       {t('detail.openManual')}
                     </Button>
@@ -185,10 +185,10 @@ function SkillDetailDialog({ skill, onClose, onToggle }: SkillDetailDialogProps)
               </div>
             </div>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 -mt-2" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
-        </CardHeader>
+        </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <div className="px-6">
@@ -336,21 +336,21 @@ function SkillDetailDialog({ skill, onClose, onToggle }: SkillDetailDialogProps)
             </div>
           </div>
 
-          <div className="flex items-center justify-between p-4 border-t bg-muted/10">
+          <div className="flex items-center justify-between p-4 border-t border-border/40 bg-muted/10">
             <div className="flex items-center gap-2">
               {skill.enabled ? (
                 <>
-                  <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  <span className="text-green-600 dark:text-green-400">{t('detail.enabled')}</span>
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium text-green-600 dark:text-green-500 tracking-tight">{t('detail.enabled')}</span>
                 </>
               ) : (
                 <>
-                  <XCircle className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-muted-foreground">{t('detail.disabled')}</span>
+                  <XCircle className="h-4 w-4 text-muted-foreground/60" />
+                  <span className="text-sm font-medium text-muted-foreground tracking-tight">{t('detail.disabled')}</span>
                 </>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 cursor-pointer">
               <Switch
                 checked={skill.enabled}
                 onCheckedChange={() => onToggle(!skill.enabled)}
@@ -359,7 +359,7 @@ function SkillDetailDialog({ skill, onClose, onToggle }: SkillDetailDialogProps)
             </div>
           </div>
         </Tabs>
-      </Card>
+      </div>
     </div>
   );
 }
@@ -385,136 +385,132 @@ function MarketplaceSkillCard({
   };
 
   return (
-    <Card
-      className="hover:border-primary/50 transition-colors cursor-pointer group"
+    <div
+      className="group cursor-pointer rounded-xl border border-border/50 bg-card/30 p-5 transition-all hover:bg-muted/40 hover:shadow-sm flex flex-col"
       onClick={handleCardClick}
     >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
-              📦
-            </div>
-            <div>
-              <CardTitle className="text-base group-hover:text-primary transition-colors">{skill.name}</CardTitle>
-              <CardDescription className="text-xs flex items-center gap-2">
-                <span>v{skill.version}</span>
-                {skill.author && (
-                  <>
-                    <span>•</span>
-                    <span>{skill.author}</span>
-                  </>
-                )}
-              </CardDescription>
-            </div>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-lg bg-background border border-border/40 shadow-sm flex items-center justify-center text-xl group-hover:scale-105 transition-transform">
+            📦
           </div>
-          <div onClick={(e) => e.stopPropagation()}>
-            <AnimatePresence mode="wait">
-              {isInstalled ? (
-                <motion.div
-                  key="uninstall"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                >
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={onUninstall}
-                    disabled={isInstalling}
-                    asChild
-                  >
-                    <motion.button whileTap={{ scale: 0.9 }}>
-                      {isInstalling ? (
-                        <div className="flex items-center justify-center gap-0.5">
-                          {[0, 1, 2].map((i) => (
-                            <motion.span
-                              key={i}
-                              className="w-1 h-1 bg-current rounded-full"
-                              animate={{
-                                opacity: [0.3, 1, 0.3],
-                                scale: [0.8, 1, 0.8],
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                repeat: Infinity,
-                                delay: i * 0.15,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <Trash2 className="h-4 w-4" />
-                      )}
-                    </motion.button>
-                  </Button>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="install"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                >
-                  <Button
-                    variant="default"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={onInstall}
-                    disabled={isInstalling}
-                    asChild
-                  >
-                    <motion.button whileTap={{ scale: 0.9 }}>
-                      {isInstalling ? (
-                        <div className="flex items-center justify-center gap-0.5">
-                          {[0, 1, 2].map((i) => (
-                            <motion.span
-                              key={i}
-                              className="w-1 h-1 bg-current rounded-full"
-                              animate={{
-                                opacity: [0.3, 1, 0.3],
-                                scale: [0.8, 1, 0.8],
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                repeat: Infinity,
-                                delay: i * 0.15,
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : (
-                        <Download className="h-4 w-4" />
-                      )}
-                    </motion.button>
-                  </Button>
-                </motion.div>
+          <div>
+            <h3 className="text-sm font-semibold tracking-tight group-hover:text-primary transition-colors">{skill.name}</h3>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 mt-0.5">
+              <span>v{skill.version}</span>
+              {skill.author && (
+                <>
+                  <span>•</span>
+                  <span>{skill.author}</span>
+                </>
               )}
-            </AnimatePresence>
+            </p>
           </div>
         </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-          {skill.description}
-        </p>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-          {skill.downloads !== undefined && (
-            <div className="flex items-center gap-1">
-              <Download className="h-3 w-3" />
-              {skill.downloads.toLocaleString()}
-            </div>
-          )}
-          {skill.stars !== undefined && (
-            <div className="flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
-              {skill.stars.toLocaleString()}
-            </div>
-          )}
+        <div onClick={(e) => e.stopPropagation()}>
+          <AnimatePresence mode="wait">
+            {isInstalled ? (
+              <motion.div
+                key="uninstall"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+              >
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onUninstall}
+                  disabled={isInstalling}
+                  asChild
+                >
+                  <motion.button whileTap={{ scale: 0.9 }}>
+                    {isInstalling ? (
+                      <div className="flex items-center justify-center gap-0.5">
+                        {[0, 1, 2].map((i) => (
+                          <motion.span
+                            key={i}
+                            className="w-1 h-1 bg-current rounded-full"
+                            animate={{
+                              opacity: [0.3, 1, 0.3],
+                              scale: [0.8, 1, 0.8],
+                            }}
+                            transition={{
+                              duration: 0.8,
+                              repeat: Infinity,
+                              delay: i * 0.15,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </motion.button>
+                </Button>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="install"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+              >
+                <Button
+                  variant="default"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onInstall}
+                  disabled={isInstalling}
+                  asChild
+                >
+                  <motion.button whileTap={{ scale: 0.9 }}>
+                    {isInstalling ? (
+                      <div className="flex items-center justify-center gap-0.5">
+                        {[0, 1, 2].map((i) => (
+                          <motion.span
+                            key={i}
+                            className="w-1 h-1 bg-current rounded-full"
+                            animate={{
+                              opacity: [0.3, 1, 0.3],
+                              scale: [0.8, 1, 0.8],
+                            }}
+                            transition={{
+                              duration: 0.8,
+                              repeat: Infinity,
+                              delay: i * 0.15,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                  </motion.button>
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1 mb-4">
+        {skill.description}
+      </p>
+      <div className="flex items-center gap-4 text-[10px] text-muted-foreground font-medium pt-3 border-t border-border/40">
+        {skill.downloads !== undefined && (
+          <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm bg-muted/40">
+            <Download className="h-3 w-3" />
+            {skill.downloads.toLocaleString()}
+          </div>
+        )}
+        {skill.stars !== undefined && (
+          <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm bg-muted/40">
+            <Sparkles className="h-3 w-3" />
+            {skill.stars.toLocaleString()}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -806,90 +802,83 @@ export function Skills() {
 
           {/* Skills Grid */}
           {filteredSkills.length === 0 ? (
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center py-12">
-                <Puzzle className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium mb-2">{t('noSkills')}</h3>
-                <p className="text-muted-foreground">
-                  {searchQuery ? t('noSkillsSearch') : t('noSkillsAvailable')}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex flex-col items-center justify-center py-16 border border-border/50 rounded-xl bg-card/10 border-dashed">
+              <div className="bg-muted/30 p-4 rounded-full mb-4">
+                <Puzzle className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+              <h3 className="text-sm font-semibold tracking-tight mb-1">{t('noSkills')}</h3>
+              <p className="text-xs text-muted-foreground max-w-[250px] text-center">
+                {searchQuery ? t('noSkillsSearch') : t('noSkillsAvailable')}
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredSkills.map((skill) => (
-                <Card
+                <div
                   key={skill.id}
                   className={cn(
-                    'cursor-pointer hover:border-primary/50 transition-colors',
-                    skill.enabled && 'border-primary/50 bg-primary/5'
+                    'group cursor-pointer rounded-xl border border-border/50 bg-card/30 p-5 transition-all hover:bg-muted/40 flex flex-col',
+                    skill.enabled && 'border-primary/30 bg-primary/5 hover:bg-primary/10'
                   )}
                   onClick={() => setSelectedSkill(skill)}
                 >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{skill.icon || '🧩'}</span>
-                        <div>
-                          <CardTitle className="text-base flex items-center gap-2">
-                            {skill.name}
-                            {skill.isCore ? (
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            ) : skill.isBundled ? (
-                              <Puzzle className="h-3 w-3 text-blue-500/70" />
-                            ) : (
-                              <Globe className="h-3 w-3 text-purple-500/70" />
-                            )}
-                          </CardTitle>
-                        </div>
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="text-2xl transition-transform group-hover:scale-110">{skill.icon || '🧩'}</div>
+                      <div>
+                        <h3 className="text-sm font-semibold tracking-tight flex items-center gap-2">
+                          {skill.name}
+                          {skill.isCore ? (
+                            <Lock className="h-3 w-3 text-muted-foreground/60" />
+                          ) : skill.isBundled ? (
+                            <Puzzle className="h-3 w-3 text-blue-500/60" />
+                          ) : (
+                            <Globe className="h-3 w-3 text-purple-500/60" />
+                          )}
+                        </h3>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {!skill.isBundled && !skill.isCore && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUninstall(skill.id);
-                            }}
-                            asChild
-                          >
-                            <motion.button whileTap={{ scale: 0.9 }}>
-                              <Trash2 className="h-4 w-4" />
-                            </motion.button>
-                          </Button>
-                        )}
-                        <Switch
-                          checked={skill.enabled}
-                          onCheckedChange={(checked) => {
-                            handleToggle(skill.id, checked);
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {!skill.isBundled && !skill.isCore && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive/70 hover:text-destructive hover:bg-destructive/10 -mr-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleUninstall(skill.id);
                           }}
-                          disabled={skill.isCore}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {skill.description}
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      {skill.version && (
-                        <Badge variant="outline" className="text-xs">
-                          v{skill.version}
-                        </Badge>
+                          asChild
+                        >
+                          <motion.button whileTap={{ scale: 0.9 }}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </motion.button>
+                        </Button>
                       )}
-                      {skill.configurable && (
-                        <Badge variant="secondary" className="text-xs">
-                          <Settings className="h-3 w-3 mr-1" />
-                          {t('detail.configurable')}
-                        </Badge>
-                      )}
+                      <Switch
+                        checked={skill.enabled}
+                        onCheckedChange={(checked) => handleToggle(skill.id, checked)}
+                        disabled={skill.isCore}
+                      />
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed flex-1">
+                    {skill.description}
+                  </p>
+                  <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/40">
+                    {skill.version && (
+                      <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0 px-1.5 h-4">
+                        v{skill.version}
+                      </Badge>
+                    )}
+                    {skill.configurable && (
+                      <Badge variant="secondary" className="text-[9px] uppercase tracking-wider py-0 px-1.5 h-4 bg-muted/50">
+                        <Settings className="h-2.5 w-2.5 mr-1" />
+                        {t('detail.configurable')}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
               ))}
             </div>
           )}

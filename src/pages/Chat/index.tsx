@@ -194,8 +194,8 @@ function WelcomeScreen() {
   const { t } = useTranslation('chat');
   return (
     <div className="flex flex-col items-center justify-center text-center py-20">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center mb-6">
-        <Bot className="h-8 w-8 text-white" />
+      <div className="w-16 h-16 rounded-2xl bg-foreground text-background flex items-center justify-center mb-6">
+        <Bot className="h-8 w-8" />
       </div>
       <h2 className="text-2xl font-bold mb-2">{t('welcome.title')}</h2>
       <p className="text-muted-foreground mb-8 max-w-md">
@@ -225,7 +225,7 @@ function WelcomeScreen() {
 function TypingIndicator() {
   return (
     <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
         <Sparkles className="h-4 w-4" />
       </div>
       <div className="bg-muted rounded-2xl px-4 py-3">
@@ -246,7 +246,7 @@ function ActivityIndicator({ phase }: { phase: 'tool_processing' }) {
   void phase;
   return (
     <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
         <Sparkles className="h-4 w-4" />
       </div>
       <div className="bg-muted rounded-2xl px-4 py-3">
