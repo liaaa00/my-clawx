@@ -4,7 +4,7 @@
  * Keys are stored in plain text alongside provider configs in a single electron-store.
  */
 
-import type { ProviderType } from './provider-registry';
+import { type ProviderType, BUILTIN_PROVIDER_TYPES } from './provider-registry';
 import { getActiveOpenClawProviders } from './openclaw-auth';
 
 // Lazy-load electron-store (ESM module)
@@ -217,16 +217,15 @@ export async function getAllProvidersWithKeyInfo(): Promise<
   const activeOpenClawProviders = getActiveOpenClawProviders();
 
   // We need to avoid deleting native ones like 'anthropic' or 'google'
-  // that don't need to exist in openclaw.json models.providers
-  const OpenClawBuiltinList = [
-    'anthropic', 'openai', 'google', 'moonshot', 'siliconflow', 'ollama'
-  ];
+  // that don't need to exist in openclaw.json models.providers. 
+  // We consider all defined providers in BUILTIN_PROVIDER_TYPES as Builtins.
+  const OpenClawBuiltinList = BUILTIN_PROVIDER_TYPES;
 
   for (const provider of providers) {
     // Sync check: If it's a custom/OAuth provider and it no longer exists in OpenClaw config
     // (e.g. wiped by Gateway due to missing plugin, or manually deleted by user)
     // we should remove it from ClawX UI to stay consistent.
-    const isBuiltin = OpenClawBuiltinList.includes(provider.type);
+    const isBuiltin = (OpenClawBuiltinList as readonly string[]).includes(provider.type);
     if (!isBuiltin && !activeOpenClawProviders.has(provider.type) && !activeOpenClawProviders.has(provider.id)) {
       console.log(`[Sync] Provider ${provider.id} (${provider.type}) missing from OpenClaw, dropping from ClawX UI`);
       await deleteProvider(provider.id);
