@@ -17,6 +17,11 @@ export const BUILTIN_PROVIDER_TYPES = [
   'minimax-portal',
   'qwen-portal',
   'ollama',
+  // Coding Plan types
+  'volcengine-coding',
+  'aliyun-coding',
+  'zhipu-coding',
+  'kimi-coding',
 ] as const;
 export type BuiltinProviderType = (typeof BUILTIN_PROVIDER_TYPES)[number];
 export type ProviderType = BuiltinProviderType | 'custom';
@@ -201,6 +206,47 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   custom: {
     envVar: 'CUSTOM_API_KEY',
     curatedModels: [],  // Custom providers have no curated list
+  },
+  // --- Coding Plan Providers ---
+  'volcengine-coding': {
+    envVar: 'VOLCENGINE_API_KEY',
+    defaultModel: 'volcengine-coding/ark-code-latest',
+    providerConfig: {
+      baseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3',
+      api: 'openai',
+      apiKeyEnv: 'VOLCENGINE_API_KEY',
+    },
+    curatedModels: ['ark-code-latest'],
+  },
+  'aliyun-coding': {
+    envVar: 'ALIYUN_CODING_API_KEY',
+    defaultModel: 'aliyun-coding/qwen-coder-plus',
+    providerConfig: {
+      baseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
+      api: 'openai',
+      apiKeyEnv: 'ALIYUN_CODING_API_KEY',
+    },
+    curatedModels: ['qwen-coder-plus', 'qwen-coder-turbo'],
+  },
+  'zhipu-coding': {
+    envVar: 'ZHIPU_API_KEY',
+    defaultModel: 'zhipu-coding/glm-4-plus',
+    providerConfig: {
+      baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
+      api: 'openai',
+      apiKeyEnv: 'ZHIPU_API_KEY',
+    },
+    curatedModels: ['glm-4-plus', 'glm-4-flash', 'codegeex-4'],
+  },
+  'kimi-coding': {
+    envVar: 'KIMI_API_KEY',
+    defaultModel: 'kimi-coding/kimi-latest',
+    providerConfig: {
+      baseUrl: 'https://api.kimi.com/coding/v1',
+      api: 'openai',
+      apiKeyEnv: 'KIMI_API_KEY',
+    },
+    curatedModels: ['kimi-latest'],
   },
   // Additional providers with env var mappings but no default model
   groq: { envVar: 'GROQ_API_KEY' },

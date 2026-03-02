@@ -18,6 +18,11 @@ export const PROVIDER_TYPES = [
   'qwen-portal',
   'ollama',
   'custom',
+  // Coding Plan types
+  'volcengine-coding',
+  'aliyun-coding',
+  'zhipu-coding',
+  'kimi-coding',
 ] as const;
 export type ProviderType = (typeof PROVIDER_TYPES)[number];
 
@@ -59,12 +64,15 @@ export interface ProviderTypeInfo {
   isOAuth?: boolean;
   /** Whether this provider also accepts a direct API key (in addition to OAuth) */
   supportsApiKey?: boolean;
+  /** Whether this is a Coding Plan provider (shown in dedicated section) */
+  isCodingPlan?: boolean;
 }
 
 import { providerIcons } from '@/assets/providers';
 
 /** All supported provider types with UI metadata */
 export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
+  // --- Standard Providers ---
   { id: 'anthropic', name: 'Anthropic', icon: '🤖', placeholder: 'sk-ant-api03-...', model: 'Claude', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'claude-sonnet-4-20250514' },
   { id: 'openai', name: 'OpenAI', icon: '💚', placeholder: 'sk-proj-...', model: 'GPT', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'gpt-4o' },
   { id: 'google', name: 'Google', icon: '🔷', placeholder: 'AIza...', model: 'Gemini', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'gemini-2.5-pro' },
@@ -77,7 +85,71 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
   { id: 'qwen-portal', name: 'Qwen (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: false, isOAuth: true, supportsApiKey: true, showModelId: true, modelIdPlaceholder: 'coder-model' },
   { id: 'ollama', name: 'Ollama', icon: '🦙', placeholder: 'Not required', requiresApiKey: false, defaultBaseUrl: 'http://localhost:11434', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'qwen3:latest' },
   { id: 'custom', name: 'Custom', icon: '⚙️', placeholder: 'API key...', requiresApiKey: true, showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'your-provider/model-id' },
+
+  // --- Coding Plan Providers (编程套餐) ---
+  {
+    id: 'volcengine-coding',
+    name: '火山引擎 Coding Plan',
+    icon: '🌋',
+    placeholder: 'xxxx-xxxx-xxxx...',
+    model: 'Doubao Code',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3',
+    defaultModelId: 'ark-code-latest',
+    showBaseUrl: true,
+    showModelId: true,
+    modelIdPlaceholder: 'ark-code-latest',
+    isCodingPlan: true,
+  },
+  {
+    id: 'aliyun-coding',
+    name: '阿里云 Coding Plan',
+    icon: '☁️',
+    placeholder: 'sk-sp-...',
+    model: 'Qwen Coder',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
+    defaultModelId: 'qwen-coder-plus',
+    showBaseUrl: true,
+    showModelId: true,
+    modelIdPlaceholder: 'qwen-coder-plus',
+    isCodingPlan: true,
+  },
+  {
+    id: 'zhipu-coding',
+    name: '智谱 AI Coding Plan',
+    icon: '🧠',
+    placeholder: 'xxxx.xxxx',
+    model: 'GLM Coder',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
+    defaultModelId: 'glm-4-plus',
+    showBaseUrl: true,
+    showModelId: true,
+    modelIdPlaceholder: 'glm-4-plus',
+    isCodingPlan: true,
+  },
+  {
+    id: 'kimi-coding',
+    name: 'Kimi Coding Plan',
+    icon: '🌙',
+    placeholder: 'sk-...',
+    model: 'Kimi Coder',
+    requiresApiKey: true,
+    defaultBaseUrl: 'https://api.kimi.com/coding/v1',
+    defaultModelId: 'kimi-latest',
+    showBaseUrl: true,
+    showModelId: true,
+    modelIdPlaceholder: 'kimi-latest',
+    isCodingPlan: true,
+  },
 ];
+
+/** Standard (non-coding-plan) providers */
+export const STANDARD_PROVIDERS = PROVIDER_TYPE_INFO.filter((p) => !p.isCodingPlan);
+
+/** Coding Plan providers */
+export const CODING_PLAN_PROVIDERS = PROVIDER_TYPE_INFO.filter((p) => p.isCodingPlan);
 
 /** Get the SVG logo URL for a provider type, falls back to undefined */
 export function getProviderIconUrl(type: ProviderType | string): string | undefined {

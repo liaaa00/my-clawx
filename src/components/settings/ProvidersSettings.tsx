@@ -146,7 +146,8 @@ export function ProvidersSettings() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {providers.map((provider) => (
+          {/* Standard Providers */}
+          {providers.filter((p) => !p.type.endsWith('-coding')).map((provider) => (
             <ProviderCard
               key={provider.id}
               provider={provider}
@@ -167,6 +168,40 @@ export function ProvidersSettings() {
               onValidateKey={(key, options) => validateApiKey(provider.id, key, options)}
             />
           ))}
+
+          {/* Coding Plan Section */}
+          {providers.some((p) => p.type.endsWith('-coding')) && (
+            <>
+              <div className="flex items-center gap-2 pt-4 pb-1">
+                <div className="h-px flex-1 bg-border" />
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  💻 编程套餐 Coding Plan
+                </span>
+                <div className="h-px flex-1 bg-border" />
+              </div>
+              {providers.filter((p) => p.type.endsWith('-coding')).map((provider) => (
+                <ProviderCard
+                  key={provider.id}
+                  provider={provider}
+                  isDefault={provider.id === defaultProviderId}
+                  isEditing={editingProvider === provider.id}
+                  onEdit={() => setEditingProvider(provider.id)}
+                  onCancelEdit={() => setEditingProvider(null)}
+                  onDelete={() => handleDeleteProvider(provider.id)}
+                  onSetDefault={() => handleSetDefault(provider.id)}
+                  onSaveEdits={async (payload) => {
+                    await updateProviderWithKey(
+                      provider.id,
+                      payload.updates || {},
+                      payload.newApiKey
+                    );
+                    setEditingProvider(null);
+                  }}
+                  onValidateKey={(key, options) => validateApiKey(provider.id, key, options)}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 
