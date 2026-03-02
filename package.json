@@ -1,5 +1,5 @@
 {
-    "name": "clawx",
+    "name": "easy-claw",
     "version": "0.2.3",
     "pnpm": {
         "onlyBuiltDependencies": [
