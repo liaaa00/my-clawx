@@ -71,9 +71,9 @@ export function ProvidersSettings() {
     apiKey: string,
     options?: { baseUrl?: string; model?: string }
   ) => {
-    // Only custom supports multiple instances.
-    // Built-in providers remain singleton by type.
-    const id = type === 'custom' ? `custom-${crypto.randomUUID()}` : type;
+    // All providers get a unique ID, allowing multiple instances of the same type
+    // (e.g. two OpenAI accounts with different keys, or two Ollama on different ports)
+    const id = `${type}-${crypto.randomUUID()}`;
     try {
       await addProvider(
         {
