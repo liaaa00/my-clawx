@@ -20,6 +20,7 @@ import {
   ExternalLink,
   BookOpen,
   Copy,
+  Zap,
 } from 'lucide-react';
 import { TitleBar } from '@/components/layout/TitleBar';
 import { Button } from '@/components/ui/button';
@@ -709,6 +710,7 @@ function ProviderContent({
   const { t } = useTranslation(['setup', 'settings']);
   const [showKey, setShowKey] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [keyValid, setKeyValid] = useState<boolean | null>(null);
   const [selectedProviderConfigId, setSelectedProviderConfigId] = useState<string | null>(null);
   const [baseUrl, setBaseUrl] = useState('');
@@ -949,6 +951,52 @@ function ProviderContent({
     }, 1000);
     return () => clearTimeout(timer);
   }, [baseUrl, apiKey, selectedProvider, showModelIdField, requiresKey, validating, oauthFlowing, handleFetchModels]);
+
+  const handleTestConnection = async () => {
+    if (!selectedProvider) return;
+    if (requiresKey && !apiKey.trim()) {
+      toast.error(t('provider.invalid'));
+      return;
+    }
+
+    setTestingConnection(true);
+    setKeyValid(null);
+    try {
+      if (requiresKey && apiKey.trim()) {
+        const result = await window.electron.ipcRenderer.invoke(
+          'provider:validateKey',
+          selectedProviderConfigId || selectedProvider,
+          apiKey.trim(),
+          { baseUrl: baseUrl.trim() || undefined }
+        ) as { valid: boolean; error?: string };
+        if (result.valid) {
+          toast.success("Connection Successful");
+          setKeyValid(true);
+        } else {
+          toast.error(result.error || t('provider.invalid'));
+          setKeyValid(false);
+        }
+      } else {
+        const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
+          type: selectedProvider,
+          baseUrl: baseUrl.trim() || undefined,
+          apiKey: apiKey.trim() || undefined,
+        }) as { success: boolean; models?: string[]; error?: string; source?: string };
+        if (res?.success && Array.isArray(res.models) && res.models.length > 0 && res.source !== 'curated') {
+          toast.success("Connection Successful");
+          setKeyValid(true);
+        } else {
+          toast.error(res?.error || t('provider.invalid'));
+          setKeyValid(false);
+        }
+      }
+    } catch (e) {
+      toast.error(String(e));
+      setKeyValid(false);
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const handleValidateAndSave = async () => {
     if (!selectedProvider) return;
@@ -1354,17 +1402,28 @@ function ProviderContent({
             </div>
           )}
 
-          {/* Validate & Save */}
-          <Button
-            onClick={handleValidateAndSave}
-            disabled={!canSubmit || validating}
-            className={cn("w-full", useOAuthFlow && "hidden")}
-          >
-            {validating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : null}
-            {requiresKey ? t('provider.validateSave') : t('provider.save')}
-          </Button>
+          {/* Actions */}
+          <div className={cn("flex flex-col gap-3", useOAuthFlow && "hidden")}>
+            <Button
+              variant="outline"
+              onClick={handleTestConnection}
+              disabled={!selectedProvider || testingConnection || validating || (requiresKey && !apiKey.trim())}
+              className="w-full"
+            >
+              {testingConnection ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+              Test Connection
+            </Button>
+            <Button
+              onClick={handleValidateAndSave}
+              disabled={!canSubmit || validating || testingConnection}
+              className="w-full"
+            >
+              {validating ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : null}
+              {requiresKey ? t('provider.validateSave') : t('provider.save')}
+            </Button>
+          </div>
 
           {keyValid !== null && (
             <p className={cn('text-sm text-center', keyValid ? 'text-green-400' : 'text-red-400')}>

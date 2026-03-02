@@ -546,14 +546,12 @@ function ProviderCard({
                   onClick={async () => {
                     setTesting(true);
                     try {
-                      const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
-                        type: provider.type,
-                        baseUrl: provider.baseUrl || undefined,
-                      }) as { success: boolean; models?: string[]; error?: string };
-                      if (res?.success && Array.isArray(res.models) && res.models.length > 0) {
-                        toast.success(t('aiProviders.toast.connectionOk', { count: res.models.length }));
+                      // Pass provider.id as string so the backend retrieves the actual stored API key
+                      const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', provider.id) as { success: boolean; models?: string[]; error?: string; source?: string };
+                      if (res?.success && res.source !== 'curated') {
+                        toast.success(t('aiProviders.toast.connectionOk', { count: res.models?.length || 0 }));
                       } else {
-                        toast.error(t('aiProviders.toast.connectionFailed'));
+                        toast.error(res?.error || t('aiProviders.toast.connectionFailed'));
                       }
                     } catch (e) {
                       toast.error(`${t('aiProviders.toast.connectionFailed')}: ${String(e)}`);
@@ -606,6 +604,7 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
   const [modelId, setModelId] = useState('');
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Model Fetching State
@@ -754,6 +753,47 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
 
   // All provider types are available — multiple instances of the same type are supported
   const availableTypes = PROVIDER_TYPE_INFO;
+
+  const handleTestConnection = async () => {
+    if (!selectedType) return;
+    const requiresKey = typeInfo?.requiresApiKey ?? false;
+    if (requiresKey && !apiKey.trim()) {
+      setValidationError(t('aiProviders.toast.invalidKey'));
+      return;
+    }
+
+    setTestingConnection(true);
+    setValidationError(null);
+    try {
+      if (requiresKey && apiKey.trim()) {
+        const result = await onValidateKey(selectedType, apiKey.trim(), {
+          baseUrl: baseUrl.trim() || undefined,
+        });
+        if (result.valid) {
+          toast.success("Connection Successful");
+        } else {
+          setValidationError(result.error || t('aiProviders.toast.connectionFailed'));
+          toast.error(result.error || t('aiProviders.toast.connectionFailed'));
+        }
+      } else {
+        const res = await window.electron.ipcRenderer.invoke('provider:fetchModels', {
+          type: selectedType,
+          baseUrl: baseUrl.trim() || undefined,
+          apiKey: apiKey.trim() || undefined,
+        }) as { success: boolean; models?: string[]; error?: string; source?: string };
+
+        if (res?.success && Array.isArray(res.models) && res.models.length > 0 && res.source !== 'curated') {
+          toast.success("Connection Successful");
+        } else {
+          toast.error(res?.error || t('aiProviders.toast.connectionFailed'));
+        }
+      }
+    } catch (e) {
+      toast.error(String(e));
+    } finally {
+      setTestingConnection(false);
+    }
+  };
 
   const handleAdd = async () => {
     if (!selectedType) return;
@@ -1085,20 +1125,33 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
 
           <Separator />
 
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={onClose}>
-              {t('aiProviders.dialog.cancel')}
-            </Button>
-            <Button
-              onClick={handleAdd}
-              className={cn(useOAuthFlow && "hidden")}
-              disabled={!selectedType || saving || ((typeInfo?.showModelId ?? false) && modelId.trim().length === 0)}
-            >
-              {saving ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              {t('aiProviders.dialog.add')}
-            </Button>
+          <div className="flex justify-between items-center mr-auto ml-0 w-full">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className={cn(useOAuthFlow && "hidden")}
+                onClick={handleTestConnection}
+                disabled={!selectedType || testingConnection || saving || (typeInfo?.requiresApiKey && !apiKey.trim())}
+              >
+                {testingConnection ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                {t('aiProviders.card.testConnection', 'Test Connection')}
+              </Button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={onClose}>
+                {t('aiProviders.dialog.cancel')}
+              </Button>
+              <Button
+                onClick={handleAdd}
+                className={cn(useOAuthFlow && "hidden")}
+                disabled={!selectedType || saving || ((typeInfo?.showModelId ?? false) && modelId.trim().length === 0)}
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                ) : null}
+                {t('aiProviders.dialog.add')}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
