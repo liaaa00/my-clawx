@@ -66,5 +66,33 @@
         "channelRequired": "请选择频道",
         "discordIdRequired": "请输入 Discord 频道 ID",
         "scheduleRequired": "请选择或输入调度计划"
+    },
+    "templates": {
+        "title": "主动任务模板",
+        "subtitle": "一键启用预设的智能任务，让 AI 主动为你工作",
+        "daily": {
+            "name": "每日工作摘要",
+            "desc": "每天早上自动汇总昨日消息和待办"
+        },
+        "codeReview": {
+            "name": "代码周报",
+            "desc": "每周五自动生成代码提交摘要"
+        },
+        "email": {
+            "name": "邮件/消息整理",
+            "desc": "定时汇总未读消息和重要通知"
+        },
+        "healthCheck": {
+            "name": "系统健康检查",
+            "desc": "定期检查开发环境和服务状态"
+        },
+        "todo": {
+            "name": "待办事项提醒",
+            "desc": "每天提醒你需要完成的事项"
+        },
+        "inspiration": {
+            "name": "内容灵感收集",
+            "desc": "定期收集和整理创意灵感"
+        }
     }
 }

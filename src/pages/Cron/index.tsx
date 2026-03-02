@@ -528,9 +528,11 @@ export function Cron() {
   const failedJobs = jobs.filter((j) => j.lastRun && !j.lastRun.success);
 
   const handleSave = useCallback(async (input: CronJobCreateInput) => {
-    if (editingJob) {
+    if (editingJob && editingJob.id) {
+      // Existing job — update
       await updateJob(editingJob.id, input);
     } else {
+      // New job or template (editingJob with empty id) — create
       await createJob(input);
     }
   }, [editingJob, createJob, updateJob]);
@@ -656,6 +658,98 @@ export function Cron() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Proactive Task Templates */}
+      {isGatewayRunning && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              🚀 {t('templates.title', '主动任务模板')}
+            </span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <p className="text-sm text-muted-foreground text-center">
+            {t('templates.subtitle', '一键启用预设的智能任务，让 AI 主动为你工作')}
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              {
+                icon: '📋',
+                name: t('templates.daily.name', '每日工作摘要'),
+                desc: t('templates.daily.desc', '每天早上自动汇总昨日消息和待办'),
+                message: '请帮我整理一份简洁的工作日报：\n1. 汇总昨天的重要消息和讨论\n2. 列出今天需要跟进的待办事项\n3. 提醒今天的日程安排\n\n请用简洁的格式输出，重点突出。',
+                schedule: '0 9 * * *',
+                taskName: t('templates.daily.name', '每日工作摘要'),
+              },
+              {
+                icon: '💻',
+                name: t('templates.codeReview.name', '代码周报'),
+                desc: t('templates.codeReview.desc', '每周五自动生成代码提交摘要'),
+                message: '请帮我生成本周代码工作周报：\n1. 总结本周完成的主要开发任务\n2. 列出代码变更的关键点\n3. 记录遇到的技术问题和解决方案\n4. 列出下周计划\n\n请用 Markdown 格式输出。',
+                schedule: '0 17 * * 5',
+                taskName: t('templates.codeReview.name', '代码周报'),
+              },
+              {
+                icon: '📧',
+                name: t('templates.email.name', '邮件/消息整理'),
+                desc: t('templates.email.desc', '定时汇总未读消息和重要通知'),
+                message: '请帮我整理和汇总近期的未读消息：\n1. 按重要程度分类\n2. 标注需要回复的消息\n3. 提取关键信息和行动项\n\n请用简洁的列表格式输出。',
+                schedule: '0 9,18 * * *',
+                taskName: t('templates.email.name', '邮件/消息整理'),
+              },
+              {
+                icon: '🔍',
+                name: t('templates.healthCheck.name', '系统健康检查'),
+                desc: t('templates.healthCheck.desc', '定期检查开发环境和服务状态'),
+                message: '请帮我检查以下内容并报告状态：\n1. 当前系统资源使用情况（CPU、内存、磁盘）\n2. 正在运行的开发服务状态\n3. 是否有异常日志或错误\n4. 需要关注的安全更新\n\n请以简洁的状态报告格式输出。',
+                schedule: '0 10 * * *',
+                taskName: t('templates.healthCheck.name', '系统健康检查'),
+              },
+              {
+                icon: '📝',
+                name: t('templates.todo.name', '待办事项提醒'),
+                desc: t('templates.todo.desc', '每天提醒你需要完成的事项'),
+                message: '请根据之前的对话记录，帮我整理待办事项清单：\n1. 列出未完成的任务\n2. 按优先级排序\n3. 标注截止日期（如有）\n4. 给出今天应该优先处理的 3 件事\n\n请用 checklist 格式输出。',
+                schedule: '0 8 * * 1-5',
+                taskName: t('templates.todo.name', '待办事项提醒'),
+              },
+              {
+                icon: '💡',
+                name: t('templates.inspiration.name', '内容灵感收集'),
+                desc: t('templates.inspiration.desc', '定期收集和整理创意灵感'),
+                message: '请帮我收集和整理一些有价值的内容灵感：\n1. 当前技术领域的热门趋势\n2. 值得关注的开源项目或工具\n3. 有启发性的技术文章摘要\n4. 可以写的技术博客主题建议\n\n请提供 3-5 个有价值的建议。',
+                schedule: '0 12 * * 1,4',
+                taskName: t('templates.inspiration.name', '内容灵感收集'),
+              },
+            ].map((tpl) => (
+              <button
+                key={tpl.taskName}
+                className="group flex flex-col items-start gap-2 p-4 rounded-lg border border-border/60 bg-card hover:border-primary/50 hover:bg-primary/5 transition-all text-left cursor-pointer"
+                onClick={() => {
+                  setEditingJob({
+                    id: '',
+                    name: tpl.taskName,
+                    message: tpl.message,
+                    schedule: tpl.schedule,
+                    target: { channelType: 'terminal' as any, channelId: '', channelName: '' },
+                    enabled: true,
+                    createdAt: '',
+                    updatedAt: '',
+                  } as CronJob);
+                  setShowDialog(true);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{tpl.icon}</span>
+                  <span className="font-medium text-sm group-hover:text-primary transition-colors">{tpl.name}</span>
+                </div>
+                <span className="text-xs text-muted-foreground line-clamp-2">{tpl.desc}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Error Display */}
       {error && (
