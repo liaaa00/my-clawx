@@ -1468,11 +1468,12 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
     const modelsUrl = buildOpenAiModelsUrl(trimmedBaseUrl);
     const modelsResult = await performProviderValidationRequest(providerType, modelsUrl, headers);
 
-    // If /models returned 404, the provider likely doesn't implement it (e.g. MiniMax).
+    // If /models returned 404 or timed out, the provider likely doesn't implement it (e.g. MiniMax, Dashscope).
     // Fall back to a minimal /chat/completions POST which almost all providers support.
-    if (modelsResult.error?.includes('API error: 404')) {
+    // If it's a definitive 401/403 ('Invalid API key'), we don't need to probe further.
+    if (!modelsResult.valid && modelsResult.error !== 'Invalid API key') {
       console.log(
-        `[clawx-validate] ${providerType} /models returned 404, falling back to /chat/completions probe`
+        `[clawx-validate] ${providerType} /models failed with "${modelsResult.error}", falling back to /chat/completions probe`
       );
       const base = normalizeBaseUrl(trimmedBaseUrl);
       const chatUrl = `${base}/chat/completions`;
