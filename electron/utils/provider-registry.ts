@@ -213,7 +213,7 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
     defaultModel: 'volcengine-coding/ark-code-latest',
     providerConfig: {
       baseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3',
-      api: 'openai',
+      api: 'openai-completions',
       apiKeyEnv: 'VOLCENGINE_API_KEY',
     },
     curatedModels: ['ark-code-latest'],
@@ -223,7 +223,7 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
     defaultModel: 'aliyun-coding/qwen-coder-plus',
     providerConfig: {
       baseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
-      api: 'openai',
+      api: 'openai-completions',
       apiKeyEnv: 'ALIYUN_CODING_API_KEY',
     },
     curatedModels: ['qwen-coder-plus', 'qwen-coder-turbo'],
@@ -233,7 +233,7 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
     defaultModel: 'zhipu-coding/glm-4-plus',
     providerConfig: {
       baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
-      api: 'openai',
+      api: 'openai-completions',
       apiKeyEnv: 'ZHIPU_API_KEY',
     },
     curatedModels: ['glm-4-plus', 'glm-4-flash', 'codegeex-4'],
@@ -243,7 +243,7 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
     defaultModel: 'kimi-coding/kimi-latest',
     providerConfig: {
       baseUrl: 'https://api.kimi.com/coding/v1',
-      api: 'openai',
+      api: 'openai-completions',
       apiKeyEnv: 'KIMI_API_KEY',
     },
     curatedModels: ['kimi-latest'],
