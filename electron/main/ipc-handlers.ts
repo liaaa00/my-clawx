@@ -1470,7 +1470,8 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
 
     // If /models returned 404 or timed out, the provider likely doesn't implement it (e.g. MiniMax, Dashscope).
     // Fall back to a minimal /chat/completions POST which almost all providers support.
-    // If it's a definitive 401/403 ('Invalid API key'), we don't need to probe further.
+    // We want to fallback UNLESS we received a definitive HTTP 401/403 ("Invalid API key").
+    // A fetch timeout returns "Connection error: ...", which should also trigger a fallback.
     if (!modelsResult.valid && modelsResult.error !== 'Invalid API key') {
       console.log(
         `[clawx-validate] ${providerType} /models failed with "${modelsResult.error}", falling back to /chat/completions probe`

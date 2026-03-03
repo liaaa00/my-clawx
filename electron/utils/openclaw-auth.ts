@@ -171,6 +171,8 @@ export function saveProviderKeyToOpenClaw(
   apiKey: string,
   agentId?: string
 ): void {
+  console.log(`[DEBUG: saveProviderKeyToOpenClaw] INCOMING -> provider: ${provider}, agentId: ${agentId}, apiKey length: ${apiKey?.length || 0}`);
+
   // OAuth providers (qwen-portal, minimax-portal) typically have their credentials
   // managed by OpenClaw plugins via `openclaw models auth login`.
   // Skip only if there's no explicit API key — meaning the user is using OAuth.
