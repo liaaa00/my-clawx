@@ -442,7 +442,7 @@ function ProviderCard({
                       <Input
                         value={modelId}
                         onChange={(e) => setModelId(e.target.value)}
-                        placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
+                        placeholder={'provider/model-id'}
                         className="h-9 text-sm"
                       />
                     )}
@@ -653,7 +653,7 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
             type,
             info?.name || type,
             '', // OAuth providers don't use a plain API key
-            { model: info?.defaultModelId }
+            { model: undefined }
           );
         } catch {
           // provider may already exist; ignore duplicate errors
@@ -820,20 +820,13 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
         }
       }
 
-      const requiresModel = typeInfo?.showModelId ?? false;
-      if (requiresModel && !modelId.trim()) {
-        setValidationError(t('aiProviders.toast.modelRequired'));
-        setSaving(false);
-        return;
-      }
-
       await onAdd(
         selectedType,
         name || (typeInfo?.id === 'custom' ? t('aiProviders.custom') : typeInfo?.name) || selectedType,
         apiKey.trim(),
         {
           baseUrl: baseUrl.trim() || undefined,
-          model: modelId.trim() || typeInfo?.defaultModelId || undefined,
+          model: modelId.trim() || undefined,
         }
       );
     } catch {
@@ -867,7 +860,7 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
                     setSelectedType(type.id);
                     setName(type.id === 'custom' ? t('aiProviders.custom') : type.name);
                     setBaseUrl(type.defaultBaseUrl || '');
-                    setModelId(type.defaultModelId || '');
+                    setModelId('');
                   }}
                   className="p-4 rounded-lg border hover:bg-accent transition-colors text-center"
                 >
@@ -1018,7 +1011,7 @@ function AddProviderDialog({ onClose, onAdd, onValidateKey }: AddProviderDialogP
                   ) : (
                     <Input
                       id="modelId"
-                      placeholder={typeInfo.modelIdPlaceholder || 'provider/model-id'}
+                      placeholder={'provider/model-id'}
                       value={modelId}
                       onChange={(e) => {
                         setModelId(e.target.value);

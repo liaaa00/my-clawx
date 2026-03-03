@@ -14,7 +14,7 @@ import type { BrowserWindow } from 'electron';
 import { logger } from './logger';
 import { getAllProviders, saveProvider, setDefaultProvider, getDefaultProvider } from './secure-storage';
 import type { ProviderConfig } from './secure-storage';
-import { BUILTIN_PROVIDER_TYPES } from './provider-registry';
+import { BUILTIN_PROVIDER_TYPES, getProviderOpenClawName } from './provider-registry';
 
 const OPENCLAW_CONFIG_PATH = join(homedir(), '.openclaw', 'openclaw.json');
 
@@ -86,7 +86,8 @@ async function syncFromOpenClaw(mainWindow: BrowserWindow | null): Promise<void>
     if (parsedModel) {
         const existingProviders = await getAllProviders();
         const matchingProvider = existingProviders.find(
-            (p) => p.type === parsedModel.provider
+            (p) => p.type === parsedModel.provider ||
+                getProviderOpenClawName(p.type) === parsedModel.provider
         );
 
         if (matchingProvider) {
@@ -141,8 +142,14 @@ async function syncFromOpenClaw(mainWindow: BrowserWindow | null): Promise<void>
         const existingProviders = await getAllProviders();
         const existingTypes = new Set<string>(existingProviders.map((p) => p.type));
 
+        // Build a set of OpenClaw-facing names for existing providers
+        // so we don't duplicate e.g. 'bailian' when 'aliyun-coding' already exists
+        const existingOpenClawNames = new Set<string>(
+            existingProviders.map((p) => getProviderOpenClawName(p.type))
+        );
+
         for (const [type, providerCfg] of Object.entries(openclawProviders)) {
-            if (!existingTypes.has(type)) {
+            if (!existingTypes.has(type) && !existingOpenClawNames.has(type)) {
                 const newId = `${type}-${Date.now()}`;
                 const models = providerCfg.models || [];
                 const firstModel = models.length > 0 ? models[0].id : '';

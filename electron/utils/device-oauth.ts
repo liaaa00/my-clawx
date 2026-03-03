@@ -20,7 +20,7 @@ import { EventEmitter } from 'events';
 import { BrowserWindow, shell } from 'electron';
 import { logger } from './logger';
 import { saveProvider, getProvider, ProviderConfig } from './secure-storage';
-import { getProviderDefaultModel } from './provider-registry';
+
 import { isOpenClawPresent } from './paths';
 import {
     loginMiniMaxPortalOAuth,
@@ -246,7 +246,7 @@ class DeviceOAuthManager extends EventEmitter {
             type: providerType,
             enabled: existing?.enabled ?? true,
             baseUrl: existing?.baseUrl,
-            model: existing?.model || getProviderDefaultModel(providerType),
+            model: existing?.model,
             createdAt: existing?.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };

@@ -56,10 +56,6 @@ export interface ProviderTypeInfo {
   showBaseUrl?: boolean;
   /** Whether to show a Model ID input field (for providers where user picks the model) */
   showModelId?: boolean;
-  /** Default / example model ID placeholder */
-  modelIdPlaceholder?: string;
-  /** Default model ID to pre-fill */
-  defaultModelId?: string;
   /** Whether this provider uses OAuth device flow instead of an API key */
   isOAuth?: boolean;
   /** Whether this provider also accepts a direct API key (in addition to OAuth) */
@@ -73,18 +69,18 @@ import { providerIcons } from '@/assets/providers';
 /** All supported provider types with UI metadata */
 export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
   // --- Standard Providers ---
-  { id: 'anthropic', name: 'Anthropic', icon: '🤖', placeholder: 'sk-ant-api03-...', model: 'Claude', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'claude-sonnet-4-20250514' },
-  { id: 'openai', name: 'OpenAI', icon: '💚', placeholder: 'sk-proj-...', model: 'GPT', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'gpt-4o' },
-  { id: 'google', name: 'Google', icon: '🔷', placeholder: 'AIza...', model: 'Gemini', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'gemini-2.5-pro' },
-  { id: 'openrouter', name: 'OpenRouter', icon: '🌐', placeholder: 'sk-or-v1-...', model: 'Multi-Model', requiresApiKey: true, showModelId: true, modelIdPlaceholder: 'openai/gpt-4o' },
-  { id: 'moonshot', name: 'Moonshot (CN)', icon: '🌙', placeholder: 'sk-...', model: 'Kimi', requiresApiKey: true, defaultBaseUrl: 'https://api.moonshot.cn/v1', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'kimi-k2.5' },
-  { id: 'siliconflow', name: 'SiliconFlow (CN)', icon: '🌊', placeholder: 'sk-...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.siliconflow.cn/v1', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'Pro/moonshotai/Kimi-K2.5' },
-  { id: 'aliyun', name: 'Alibaba Cloud (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'qwen-plus' },
-  { id: 'volcengine', name: 'Volcengine (CN)', icon: '🌋', placeholder: 'xxxx-xxxx-xxxx...', model: 'Doubao', requiresApiKey: true, defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'ep-xxxxxxxx-xxxx' },
-  { id: 'minimax-portal', name: 'MiniMax (CN)', icon: '☁️', placeholder: 'sk-...', model: 'MiniMax', requiresApiKey: false, isOAuth: true, supportsApiKey: true, showModelId: true, modelIdPlaceholder: 'MiniMax-M2.1' },
-  { id: 'qwen-portal', name: 'Qwen (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: false, isOAuth: true, supportsApiKey: true, showModelId: true, modelIdPlaceholder: 'coder-model' },
-  { id: 'ollama', name: 'Ollama', icon: '🦙', placeholder: 'Not required', requiresApiKey: false, defaultBaseUrl: 'http://localhost:11434', showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'qwen3:latest' },
-  { id: 'custom', name: 'Custom', icon: '⚙️', placeholder: 'API key...', requiresApiKey: true, showBaseUrl: true, showModelId: true, modelIdPlaceholder: 'your-provider/model-id' },
+  { id: 'anthropic', name: 'Anthropic', icon: '🤖', placeholder: 'sk-ant-api03-...', model: 'Claude', requiresApiKey: true, showModelId: true },
+  { id: 'openai', name: 'OpenAI', icon: '💚', placeholder: 'sk-proj-...', model: 'GPT', requiresApiKey: true, showModelId: true },
+  { id: 'google', name: 'Google', icon: '🔷', placeholder: 'AIza...', model: 'Gemini', requiresApiKey: true, showModelId: true },
+  { id: 'openrouter', name: 'OpenRouter', icon: '🌐', placeholder: 'sk-or-v1-...', model: 'Multi-Model', requiresApiKey: true, showModelId: true },
+  { id: 'moonshot', name: 'Moonshot (CN)', icon: '🌙', placeholder: 'sk-...', model: 'Kimi', requiresApiKey: true, defaultBaseUrl: 'https://api.moonshot.cn/v1', showBaseUrl: true, showModelId: true },
+  { id: 'siliconflow', name: 'SiliconFlow (CN)', icon: '🌊', placeholder: 'sk-...', model: 'Multi-Model', requiresApiKey: true, defaultBaseUrl: 'https://api.siliconflow.cn/v1', showBaseUrl: true, showModelId: true },
+  { id: 'aliyun', name: 'Alibaba Cloud (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: true, defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', showBaseUrl: true, showModelId: true },
+  { id: 'volcengine', name: 'Volcengine (CN)', icon: '🌋', placeholder: 'xxxx-xxxx-xxxx...', model: 'Doubao', requiresApiKey: true, defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/v3', showBaseUrl: true, showModelId: true },
+  { id: 'minimax-portal', name: 'MiniMax (CN)', icon: '☁️', placeholder: 'sk-...', model: 'MiniMax', requiresApiKey: false, isOAuth: true, supportsApiKey: true, showModelId: true },
+  { id: 'qwen-portal', name: 'Qwen (CN)', icon: '☁️', placeholder: 'sk-...', model: 'Qwen', requiresApiKey: false, isOAuth: true, supportsApiKey: true, showModelId: true },
+  { id: 'ollama', name: 'Ollama', icon: '🦙', placeholder: 'Not required', requiresApiKey: false, defaultBaseUrl: 'http://localhost:11434', showBaseUrl: true, showModelId: true },
+  { id: 'custom', name: 'Custom', icon: '⚙️', placeholder: 'API key...', requiresApiKey: true, showBaseUrl: true, showModelId: true },
 
   // --- Coding Plan Providers (编程套餐) ---
   {
@@ -95,10 +91,8 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     model: 'Doubao Code',
     requiresApiKey: true,
     defaultBaseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3',
-    defaultModelId: 'ark-code-latest',
     showBaseUrl: true,
     showModelId: true,
-    modelIdPlaceholder: 'ark-code-latest',
     isCodingPlan: true,
   },
   {
@@ -109,10 +103,8 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     model: 'Qwen Coder',
     requiresApiKey: true,
     defaultBaseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
-    defaultModelId: 'qwen-coder-plus',
     showBaseUrl: true,
     showModelId: true,
-    modelIdPlaceholder: 'qwen-coder-plus',
     isCodingPlan: true,
   },
   {
@@ -123,10 +115,8 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     model: 'GLM Coder',
     requiresApiKey: true,
     defaultBaseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
-    defaultModelId: 'glm-4-plus',
     showBaseUrl: true,
     showModelId: true,
-    modelIdPlaceholder: 'glm-4-plus',
     isCodingPlan: true,
   },
   {
@@ -137,10 +127,8 @@ export const PROVIDER_TYPE_INFO: ProviderTypeInfo[] = [
     model: 'Kimi Coder',
     requiresApiKey: true,
     defaultBaseUrl: 'https://api.kimi.com/coding/v1',
-    defaultModelId: 'kimi-latest',
     showBaseUrl: true,
     showModelId: true,
-    modelIdPlaceholder: 'kimi-latest',
     isCodingPlan: true,
   },
 ];

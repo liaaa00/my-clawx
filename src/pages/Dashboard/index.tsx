@@ -15,7 +15,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useGatewayStore } from '@/stores/gateway';
@@ -24,7 +24,7 @@ import { useSkillsStore } from '@/stores/skills';
 import { useSettingsStore } from '@/stores/settings';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { useTranslation } from 'react-i18next';
-import { cn } from '@/lib/utils';
+
 
 export function Dashboard() {
   const { t } = useTranslation('dashboard');

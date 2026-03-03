@@ -8,8 +8,8 @@ import { join } from 'path';
 import { homedir } from 'os';
 import {
   getProviderEnvVar,
-  getProviderDefaultModel,
   getProviderConfig,
+  getProviderOpenClawName,
 } from './provider-registry';
 
 const AUTH_STORE_VERSION = 1;
@@ -187,6 +187,8 @@ export function saveProviderKeyToOpenClaw(
   // OpenClaw's auth system rejects empty keys, but Ollama ignores the
   // Authorization header entirely, so a placeholder is safe.
   const LOCAL_NO_KEY_PROVIDERS = ['ollama'];
+  // Use the OpenClaw-facing provider name so auth-profiles match openclaw.json
+  const openclawName = getProviderOpenClawName(provider);
   const effectiveKey = apiKey || (LOCAL_NO_KEY_PROVIDERS.includes(provider) ? 'ollama' : apiKey);
   const agentIds = agentId ? [agentId] : discoverAgentIds();
   if (agentIds.length === 0) agentIds.push('main');
@@ -195,35 +197,41 @@ export function saveProviderKeyToOpenClaw(
     const store = readAuthProfiles(id);
 
     // Profile ID follows OpenClaw convention: <provider>:default
-    const profileId = `${provider}:default`;
+    const profileId = `${openclawName}:default`;
 
     // Upsert the profile entry
     store.profiles[profileId] = {
       type: 'api_key',
-      provider,
+      provider: openclawName,
       key: effectiveKey,
     };
+
+    // Clean out any stale entry under the old internal name
+    const oldProfileId = `${provider}:default`;
+    if (openclawName !== provider && store.profiles[oldProfileId]) {
+      delete store.profiles[oldProfileId];
+    }
 
     // Update order to include this profile
     if (!store.order) {
       store.order = {};
     }
-    if (!store.order[provider]) {
-      store.order[provider] = [];
+    if (!store.order[openclawName]) {
+      store.order[openclawName] = [];
     }
-    if (!store.order[provider].includes(profileId)) {
-      store.order[provider].push(profileId);
+    if (!store.order[openclawName].includes(profileId)) {
+      store.order[openclawName].push(profileId);
     }
 
     // Set as last good
     if (!store.lastGood) {
       store.lastGood = {};
     }
-    store.lastGood[provider] = profileId;
+    store.lastGood[openclawName] = profileId;
 
     writeAuthProfiles(store, id);
   }
-  console.log(`Saved API key for provider "${provider}" to OpenClaw auth-profiles (agents: ${agentIds.join(', ')})`);
+  console.log(`Saved API key for provider "${openclawName}" to OpenClaw auth-profiles (agents: ${agentIds.join(', ')})`);
 }
 
 /**
@@ -357,35 +365,52 @@ export function setOpenClawDefaultModel(provider: string, modelOverride?: string
     console.warn('Failed to read openclaw.json, creating fresh config:', err);
   }
 
-  const model = modelOverride || getProviderDefaultModel(provider);
-  if (!model) {
-    console.warn(`No default model mapping for provider "${provider}"`);
-    return;
+  const model = modelOverride;
+  let modelId: string | undefined = undefined;
+
+  // Some provider types need a different name in openclaw.json
+  const openclawName = getProviderOpenClawName(provider);
+
+  // We no longer abort if there is no default model.
+  // The user explicitly requested to NOT enforce default model ids.
+  if (model) {
+    // Strip the internal provider prefix to get the bare model ID
+    modelId = model.startsWith(`${provider}/`)
+      ? model.slice(provider.length + 1)
+      : model.startsWith(`${openclawName}/`)
+        ? model.slice(openclawName.length + 1)
+        : model;
+
+    // Build the model reference using the OpenClaw-facing provider name
+    const primaryModel = `${openclawName}/${modelId}`;
+
+    // Set the default model for the agents
+    // model must be an object: { primary: "provider/model", fallbacks?: [] }
+    const agents = (config.agents || {}) as Record<string, unknown>;
+    const defaults = (agents.defaults || {}) as Record<string, unknown>;
+
+    // Only set primary model if one was actually provided
+    defaults.model = { primary: primaryModel };
+
+    agents.defaults = defaults;
+    config.agents = agents;
   }
-
-  const modelId = model.startsWith(`${provider}/`)
-    ? model.slice(provider.length + 1)
-    : model;
-
-  // Set the default model for the agents
-  // model must be an object: { primary: "provider/model", fallbacks?: [] }
-  const agents = (config.agents || {}) as Record<string, unknown>;
-  const defaults = (agents.defaults || {}) as Record<string, unknown>;
-  defaults.model = { primary: model };
-  agents.defaults = defaults;
-  config.agents = agents;
 
   // Configure models.providers for providers that need explicit registration.
   // Built-in providers (anthropic, google) are part of OpenClaw's pi-ai catalog
   // and must NOT have a models.providers entry — it would override the built-in.
   const providerCfg = getProviderConfig(provider);
+  // openclawName already resolved above (e.g. 'aliyun-coding' → 'bailian')
+
   if (providerCfg) {
     const models = (config.models || {}) as Record<string, unknown>;
+    // Add mode: merge so custom providers coexist with built-in ones
+    if (!models.mode) models.mode = 'merge';
     const providers = (models.providers || {}) as Record<string, unknown>;
 
     const existingProvider =
-      providers[provider] && typeof providers[provider] === 'object'
-        ? (providers[provider] as Record<string, unknown>)
+      providers[openclawName] && typeof providers[openclawName] === 'object'
+        ? (providers[openclawName] as Record<string, unknown>)
         : {};
 
     const existingModels = Array.isArray(existingProvider.models)
@@ -404,17 +429,20 @@ export function setOpenClawDefaultModel(provider: string, modelOverride?: string
       mergedModels.push({ id: modelId, name: modelId });
     }
 
-    providers[provider] = {
+    providers[openclawName] = {
       ...existingProvider,
       baseUrl: baseUrlOverride || providerCfg.baseUrl,
       api: providerCfg.api,
       models: mergedModels,
     };
 
-    // Check if we should define apiKey. We only define it if the user wants it to pull from env
-    // Use the `env:VAR_NAME` syntax specifically supported by Moltbot/OpenClaw configuration parsing.
-    // However, since we populate `auth-profiles.json` actively with real keys, omitting it is preferred.
-    console.log(`Configured models.providers.${provider} with baseUrl=${baseUrlOverride || providerCfg.baseUrl}, model=${modelId}`);
+    // Remove any stale entry under the old internal name
+    if (openclawName !== provider && providers[provider]) {
+      delete providers[provider];
+      console.log(`Removed stale models.providers.${provider} (remapped to ${openclawName})`);
+    }
+
+    console.log(`Configured models.providers.${openclawName} with baseUrl=${baseUrlOverride || providerCfg.baseUrl}, model=${modelId}`);
 
     models.providers = providers;
     config.models = models;
@@ -476,21 +504,20 @@ export function setOpenClawDefaultModelWithOverride(
     console.warn('Failed to read openclaw.json, creating fresh config:', err);
   }
 
-  const model = modelOverride || getProviderDefaultModel(provider);
-  if (!model) {
-    console.warn(`No default model mapping for provider "${provider}"`);
-    return;
+  const model = modelOverride;
+  let modelId: string | undefined = undefined;
+
+  if (model) {
+    modelId = model.startsWith(`${provider}/`)
+      ? model.slice(provider.length + 1)
+      : model;
+
+    const agents = (config.agents || {}) as Record<string, unknown>;
+    const defaults = (agents.defaults || {}) as Record<string, unknown>;
+    defaults.model = { primary: model };
+    agents.defaults = defaults;
+    config.agents = agents;
   }
-
-  const modelId = model.startsWith(`${provider}/`)
-    ? model.slice(provider.length + 1)
-    : model;
-
-  const agents = (config.agents || {}) as Record<string, unknown>;
-  const defaults = (agents.defaults || {}) as Record<string, unknown>;
-  defaults.model = { primary: model };
-  agents.defaults = defaults;
-  config.agents = agents;
 
   if (override.baseUrl && override.api) {
     const models = (config.models || {}) as Record<string, unknown>;

@@ -34,7 +34,6 @@ interface ProviderModelEntry extends Record<string, unknown> {
 
 interface ProviderBackendMeta {
   envVar?: string;
-  defaultModel?: string;
   /** OpenClaw models.providers config (omit for built-in providers like anthropic) */
   providerConfig?: {
     baseUrl: string;
@@ -44,12 +43,17 @@ interface ProviderBackendMeta {
   };
   /** Curated list of popular model IDs to show when API /models listing fails or is unavailable */
   curatedModels?: string[];
+  /**
+   * The provider name OpenClaw expects in openclaw.json.
+   * When set, writing to openclaw.json will use this name instead of the internal type.
+   * Example: internal type 'aliyun-coding' maps to OpenClaw name 'bailian'.
+   */
+  openclawProviderName?: string;
 }
 
 const REGISTRY: Record<string, ProviderBackendMeta> = {
   anthropic: {
     envVar: 'ANTHROPIC_API_KEY',
-    defaultModel: 'anthropic/claude-opus-4-6',
     curatedModels: [
       'claude-opus-4-6',
       'claude-sonnet-4-20250514',
@@ -60,7 +64,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   openai: {
     envVar: 'OPENAI_API_KEY',
-    defaultModel: 'openai/gpt-5.2',
     providerConfig: {
       baseUrl: 'https://api.openai.com/v1',
       api: 'openai-responses',
@@ -80,7 +83,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   google: {
     envVar: 'GEMINI_API_KEY',
-    defaultModel: 'google/gemini-3.1-pro-preview',
     curatedModels: [
       'gemini-2.5-pro',
       'gemini-2.5-flash',
@@ -92,7 +94,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   openrouter: {
     envVar: 'OPENROUTER_API_KEY',
-    defaultModel: 'openrouter/anthropic/claude-opus-4.6',
     providerConfig: {
       baseUrl: 'https://openrouter.ai/api/v1',
       api: 'openai-completions',
@@ -111,7 +112,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   moonshot: {
     envVar: 'MOONSHOT_API_KEY',
-    defaultModel: 'moonshot/kimi-k2.5',
     providerConfig: {
       baseUrl: 'https://api.moonshot.cn/v1',
       api: 'openai-completions',
@@ -138,7 +138,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   siliconflow: {
     envVar: 'SILICONFLOW_API_KEY',
-    defaultModel: 'siliconflow/deepseek-ai/DeepSeek-V3',
     providerConfig: {
       baseUrl: 'https://api.siliconflow.cn/v1',
       api: 'openai-completions',
@@ -155,7 +154,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   aliyun: {
     envVar: 'ALIYUN_API_KEY',
-    defaultModel: 'aliyun/qwen-plus',
     providerConfig: {
       baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       api: 'openai-completions',
@@ -176,7 +174,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   volcengine: {
     envVar: 'VOLCENGINE_API_KEY',
-    defaultModel: 'volcengine/ep-xxxx',
     providerConfig: {
       baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
       api: 'openai-completions',
@@ -195,10 +192,8 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
     ],
   },
   'minimax-portal': {
-    defaultModel: 'minimax-portal/MiniMax-M2.1',
   },
   'qwen-portal': {
-    defaultModel: 'qwen-portal/coder-model',
   },
   ollama: {
     curatedModels: [],  // Ollama models are always dynamic (local), no curated list
@@ -210,43 +205,69 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   // --- Coding Plan Providers ---
   'volcengine-coding': {
     envVar: 'VOLCENGINE_API_KEY',
-    defaultModel: 'volcengine-coding/ark-code-latest',
+    openclawProviderName: 'volcengine-plan',
     providerConfig: {
       baseUrl: 'https://ark.cn-beijing.volces.com/api/coding/v3',
       api: 'openai-completions',
       apiKeyEnv: 'VOLCENGINE_API_KEY',
+      models: [
+        { id: 'ark-code-latest', name: 'Ark Coding Plan' },
+        { id: 'doubao-seed-code', name: 'Doubao Seed Code' },
+        { id: 'glm-4.7', name: 'GLM 4.7 Coding' },
+        { id: 'kimi-k2-thinking', name: 'Kimi K2 Thinking' },
+        { id: 'kimi-k2.5', name: 'Kimi K2.5 Coding' },
+        { id: 'doubao-seed-code-preview-251028', name: 'Doubao Seed Code Preview' },
+      ],
     },
-    curatedModels: ['ark-code-latest'],
+    curatedModels: ['ark-code-latest', 'doubao-seed-code', 'glm-4.7', 'kimi-k2-thinking', 'kimi-k2.5', 'doubao-seed-code-preview-251028'],
   },
   'aliyun-coding': {
     envVar: 'ALIYUN_CODING_API_KEY',
-    defaultModel: 'aliyun-coding/qwen-coder-plus',
+    openclawProviderName: 'bailian',
     providerConfig: {
       baseUrl: 'https://coding.dashscope.aliyuncs.com/v1',
       api: 'openai-completions',
       apiKeyEnv: 'ALIYUN_CODING_API_KEY',
+      models: [
+        { id: 'qwen3.5-plus', name: 'qwen3.5-plus' },
+        { id: 'qwen3-max-2026-01-23', name: 'qwen3-max-2026-01-23' },
+        { id: 'qwen3-coder-next', name: 'qwen3-coder-next' },
+        { id: 'qwen3-coder-plus', name: 'qwen3-coder-plus' },
+        { id: 'MiniMax-M2.5', name: 'MiniMax-M2.5' },
+        { id: 'glm-5', name: 'glm-5' },
+        { id: 'glm-4.7', name: 'glm-4.7' },
+        { id: 'kimi-k2.5', name: 'kimi-k2.5' },
+      ],
     },
-    curatedModels: ['qwen-coder-plus', 'qwen-coder-turbo'],
+    curatedModels: ['qwen3.5-plus', 'qwen3-coder-next', 'qwen3-coder-plus', 'qwen3-max-2026-01-23', 'MiniMax-M2.5', 'glm-5', 'glm-4.7', 'kimi-k2.5'],
   },
   'zhipu-coding': {
     envVar: 'ZHIPU_API_KEY',
-    defaultModel: 'zhipu-coding/glm-4-plus',
+    openclawProviderName: 'zhipu',
     providerConfig: {
       baseUrl: 'https://open.bigmodel.cn/api/coding/paas/v4',
       api: 'openai-completions',
       apiKeyEnv: 'ZHIPU_API_KEY',
+      models: [
+        { id: 'glm-5', name: 'GLM-5' },
+        { id: 'glm-4.7', name: 'GLM-4.7' },
+        { id: 'glm-4.5-air', name: 'GLM-4.5 Air' },
+      ],
     },
-    curatedModels: ['glm-4-plus', 'glm-4-flash', 'codegeex-4'],
+    curatedModels: ['glm-5', 'glm-4.7', 'glm-4.5-air'],
   },
   'kimi-coding': {
     envVar: 'KIMI_API_KEY',
-    defaultModel: 'kimi-coding/kimi-latest',
+    openclawProviderName: 'moonshot-coding',
     providerConfig: {
       baseUrl: 'https://api.kimi.com/coding/v1',
       api: 'openai-completions',
       apiKeyEnv: 'KIMI_API_KEY',
+      models: [
+        { id: 'kimi-for-coding', name: 'Kimi for Coding' },
+      ],
     },
-    curatedModels: ['kimi-latest'],
+    curatedModels: ['kimi-for-coding'],
   },
   // Additional providers with env var mappings but no default model
   groq: { envVar: 'GROQ_API_KEY' },
@@ -261,10 +282,16 @@ export function getProviderEnvVar(type: string): string | undefined {
   return REGISTRY[type]?.envVar;
 }
 
-/** Get the default model string for a provider type */
-export function getProviderDefaultModel(type: string): string | undefined {
-  return REGISTRY[type]?.defaultModel;
+/**
+ * Get the OpenClaw-facing provider name for a provider type.
+ * Some internal types (e.g. 'aliyun-coding') need to be registered under
+ * a different name in openclaw.json (e.g. 'bailian') per official docs.
+ * Returns the mapped name, or the original type if no mapping exists.
+ */
+export function getProviderOpenClawName(type: string): string {
+  return REGISTRY[type]?.openclawProviderName || type;
 }
+
 
 /** Get the OpenClaw provider config (baseUrl, api, apiKeyEnv, models) */
 export function getProviderConfig(

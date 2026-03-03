@@ -859,7 +859,7 @@ function ProviderContent({
 
           const info = providers.find((p) => p.id === selectedProvider);
           setBaseUrl(savedProvider?.baseUrl || info?.defaultBaseUrl || '');
-          setModelId(savedProvider?.model || info?.defaultModelId || '');
+          setModelId(savedProvider?.model || '');
         }
       } catch (error) {
         if (!cancelled) {
@@ -1026,7 +1026,6 @@ function ProviderContent({
       }
 
       const effectiveModelId =
-        selectedProviderData?.defaultModelId ||
         modelId.trim() ||
         undefined;
 
@@ -1240,7 +1239,7 @@ function ProviderContent({
                 <Input
                   id="modelId"
                   type="text"
-                  placeholder={selectedProviderData?.modelIdPlaceholder || 'e.g. deepseek-ai/DeepSeek-V3'}
+                  placeholder={'e.g. deepseek-ai/DeepSeek-V3'}
                   value={modelId}
                   onChange={(e) => {
                     setModelId(e.target.value);
