@@ -406,9 +406,12 @@ export function setOpenClawDefaultModel(provider: string, modelOverride?: string
       ...existingProvider,
       baseUrl: baseUrlOverride || providerCfg.baseUrl,
       api: providerCfg.api,
-      apiKey: providerCfg.apiKeyEnv,
       models: mergedModels,
     };
+
+    // Check if we should define apiKey. We only define it if the user wants it to pull from env
+    // Use the `env:VAR_NAME` syntax specifically supported by Moltbot/OpenClaw configuration parsing.
+    // However, since we populate `auth-profiles.json` actively with real keys, omitting it is preferred.
     console.log(`Configured models.providers.${provider} with baseUrl=${baseUrlOverride || providerCfg.baseUrl}, model=${modelId}`);
 
     models.providers = providers;
