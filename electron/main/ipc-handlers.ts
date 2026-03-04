@@ -24,6 +24,7 @@ import {
 } from '../utils/secure-storage';
 import { getOpenClawStatus, getOpenClawDir, getOpenClawConfigDir, getOpenClawSkillsDir, ensureDir } from '../utils/paths';
 import { getOpenClawCliCommand, installOpenClawCliMac } from '../utils/openclaw-cli';
+import { checkOpenClawUpdate, performOpenClawUpdate } from '../utils/openclaw-updater';
 import { getSetting } from '../utils/store';
 import {
   saveProviderKeyToOpenClaw,
@@ -635,6 +636,26 @@ function registerOpenClawHandlers(): void {
   // Install a system-wide openclaw command on macOS (requires admin prompt)
   ipcMain.handle('openclaw:installCliMac', async () => {
     return installOpenClawCliMac();
+  });
+
+  // Check if an OpenClaw update is available
+  ipcMain.handle('openclaw:checkUpdate', async () => {
+    try {
+      return await checkOpenClawUpdate();
+    } catch (error) {
+      logger.error('[IPC] openclaw:checkUpdate failed:', error);
+      return { current: null, latest: null, updateAvailable: false, error: String(error) };
+    }
+  });
+
+  // Perform an OpenClaw update
+  ipcMain.handle('openclaw:performUpdate', async () => {
+    try {
+      return await performOpenClawUpdate();
+    } catch (error) {
+      logger.error('[IPC] openclaw:performUpdate failed:', error);
+      return { success: false, error: String(error) };
+    }
   });
 
   // ==================== Channel Configuration Handlers ====================

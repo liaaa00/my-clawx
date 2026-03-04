@@ -429,11 +429,15 @@ export function setOpenClawDefaultModel(provider: string, modelOverride?: string
       mergedModels.push({ id: modelId, name: modelId });
     }
 
+    const LOCAL_NO_KEY_PROVIDERS = ['ollama'];
     providers[openclawName] = {
       ...existingProvider,
       baseUrl: baseUrlOverride || providerCfg.baseUrl,
       api: providerCfg.api,
       models: mergedModels,
+      // For local providers (Ollama), inject a dummy apiKey so the Gateway
+      // doesn't reject requests with "No API key found"
+      ...(LOCAL_NO_KEY_PROVIDERS.includes(provider) ? { apiKey: 'ollama' } : {}),
     };
 
     // Remove any stale entry under the old internal name

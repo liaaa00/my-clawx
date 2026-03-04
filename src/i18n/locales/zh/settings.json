@@ -90,7 +90,17 @@
     "appLogs": "应用日志",
     "openFolder": "打开文件夹",
     "autoStart": "自动启动网关",
-    "autoStartDesc": "ClawX 启动时自动启动网关"
+    "autoStartDesc": "ClawX 启动时自动启动网关",
+    "openclawVersion": "OpenClaw 引擎",
+    "openclawVersionDesc": "AI 引擎版本",
+    "checkUpdate": "检查更新",
+    "checking": "检查中...",
+    "updating": "更新中...",
+    "updateTo": "更新到 v{{version}}",
+    "upToDate": "已是最新",
+    "updateSuccess": "更新成功，新版本 v{{version}}",
+    "updateFailed": "更新失败",
+    "restartGateway": "重启网关以生效"
   },
   "updates": {
     "title": "更新",

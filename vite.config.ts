@@ -19,7 +19,14 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {
-              external: ['electron', 'electron-store', 'electron-updater', 'ws'],
+              // Externalize ALL node_modules for electron main process.
+              // The main process runs in Node.js; packages are available at runtime.
+              external: (id) => {
+                if (id.startsWith('electron')) return true;
+                if (id.startsWith('node:')) return true;
+                if (!id.startsWith('.') && !id.startsWith('/') && !id.includes(':')) return true;
+                return false;
+              },
             },
           },
         },

@@ -2,7 +2,7 @@
  * Settings Page
  * Application configuration
  */
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Sun,
   Moon,
@@ -15,6 +15,7 @@ import {
   FileText,
   Settings as SettingsIcon,
   X as XIcon,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -51,6 +52,67 @@ export function Settings() {
   const currentVersion = useUpdateStore((state) => state.currentVersion);
   const [showLogs, setShowLogs] = useState(false);
   const [logContent, setLogContent] = useState('');
+
+  // OpenClaw update state
+  const [openclawVersion, setOpenclawVersion] = useState<string | null>(null);
+  const [openclawLatest, setOpenclawLatest] = useState<string | null>(null);
+  const [openclawUpdateAvailable, setOpenclawUpdateAvailable] = useState(false);
+  const [openclawChecking, setOpenclawChecking] = useState(false);
+  const [openclawUpdating, setOpenclawUpdating] = useState(false);
+  const [openclawUpdateMsg, setOpenclawUpdateMsg] = useState<string | null>(null);
+
+  // Check OpenClaw version on mount
+  useEffect(() => {
+    window.electron.ipcRenderer.invoke('openclaw:checkUpdate').then((result: any) => {
+      if (result) {
+        setOpenclawVersion(result.current);
+        setOpenclawLatest(result.latest);
+        setOpenclawUpdateAvailable(result.updateAvailable);
+      }
+    }).catch(() => { });
+  }, []);
+
+  const handleCheckOpenClawUpdate = useCallback(async () => {
+    setOpenclawChecking(true);
+    setOpenclawUpdateMsg(null);
+    try {
+      const result = await window.electron.ipcRenderer.invoke('openclaw:checkUpdate') as any;
+      if (result) {
+        setOpenclawVersion(result.current);
+        setOpenclawLatest(result.latest);
+        setOpenclawUpdateAvailable(result.updateAvailable);
+        if (!result.updateAvailable) {
+          setOpenclawUpdateMsg(t('gateway.upToDate'));
+        }
+      }
+    } catch {
+      setOpenclawUpdateMsg(t('gateway.updateFailed'));
+    } finally {
+      setOpenclawChecking(false);
+    }
+  }, [t]);
+
+  const handlePerformOpenClawUpdate = useCallback(async () => {
+    setOpenclawUpdating(true);
+    setOpenclawUpdateMsg(null);
+    try {
+      const result = await window.electron.ipcRenderer.invoke('openclaw:performUpdate') as any;
+      if (result.success) {
+        setOpenclawVersion(result.version || openclawLatest);
+        setOpenclawUpdateAvailable(false);
+        setOpenclawUpdateMsg(t('gateway.updateSuccess', { version: result.version || openclawLatest }));
+        toast.success(t('gateway.restartGateway'));
+        // Auto restart gateway after update
+        setTimeout(() => restartGateway(), 2000);
+      } else {
+        setOpenclawUpdateMsg(result.error || t('gateway.updateFailed'));
+      }
+    } catch {
+      setOpenclawUpdateMsg(t('gateway.updateFailed'));
+    } finally {
+      setOpenclawUpdating(false);
+    }
+  }, [t, openclawLatest, restartGateway]);
 
   const handleShowLogs = async () => {
     try {
@@ -200,6 +262,57 @@ export function Settings() {
               <RefreshCw className="h-3 w-3 mr-1.5" />
               {t('common:actions.restart')}
             </Button>
+          </div>
+
+          <Separator className="bg-border/40" />
+
+          {/* OpenClaw Engine Version & Update */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-sm font-medium">{t('gateway.openclawVersion')}</Label>
+              <p className="text-xs text-muted-foreground">
+                {openclawVersion ? `v${openclawVersion}` : '—'}
+                {openclawUpdateMsg && (
+                  <span className={cn(
+                    'ml-2',
+                    openclawUpdateMsg.includes('成功') || openclawUpdateMsg.includes('success') ? 'text-green-500' : ''
+                  )}>
+                    · {openclawUpdateMsg}
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              {openclawUpdateAvailable && openclawLatest ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 text-xs font-medium"
+                  disabled={openclawUpdating}
+                  onClick={handlePerformOpenClawUpdate}
+                >
+                  {openclawUpdating ? (
+                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{t('gateway.updating')}</>
+                  ) : (
+                    <><Download className="h-3 w-3 mr-1.5" />{t('gateway.updateTo', { version: openclawLatest })}</>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs font-medium"
+                  disabled={openclawChecking}
+                  onClick={handleCheckOpenClawUpdate}
+                >
+                  {openclawChecking ? (
+                    <><Loader2 className="h-3 w-3 mr-1.5 animate-spin" />{t('gateway.checking')}</>
+                  ) : (
+                    <><RefreshCw className="h-3 w-3 mr-1.5" />{t('gateway.checkUpdate')}</>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </section>
