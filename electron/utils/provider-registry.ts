@@ -196,11 +196,6 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   'qwen-portal': {
   },
   ollama: {
-    providerConfig: {
-      baseUrl: 'http://localhost:11434/v1',
-      api: 'openai-completions',
-      apiKeyEnv: 'OLLAMA_API_KEY',
-    },
     curatedModels: [],  // Ollama models are always dynamic (local), no curated list
   },
   custom: {
