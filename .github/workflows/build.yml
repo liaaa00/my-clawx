@@ -67,6 +67,7 @@ jobs:
 
       - name: Build macOS (${{ matrix.arch }})
         run: |
+          export NODE_OPTIONS="--max-old-space-size=4096"
           pnpm run build:vite
           npx zx scripts/bundle-openclaw.mjs
           npx electron-builder --mac --${{ matrix.arch }}
