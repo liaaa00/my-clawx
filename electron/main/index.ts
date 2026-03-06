@@ -2,27 +2,6 @@
  * Electron Main Process Entry
  * Manages window creation, system tray, and IPC handlers
  */
-
-// ── Module resolution patch ──────────────────────────────────────────────────
-// When packaged, `openclaw` is bundled as an extraResource at
-// `resources/openclaw/` instead of `node_modules/openclaw/`.
-// `clawhub` (a direct dependency) internally requires `openclaw/plugin-sdk`,
-// which Node.js cannot resolve from inside the asar.  We add the resources
-// directory and openclaw's own node_modules to the global module search paths
-// so that `require('openclaw/...')` finds the right package.
-import Module from 'module';
-import { app as _earlyApp } from 'electron';
-
-if (_earlyApp.isPackaged) {
-  const resourcesRoot = process.resourcesPath;
-  const gp = (Module as unknown as { globalPaths: string[] }).globalPaths;
-  // This makes require('openclaw') resolve to resources/openclaw
-  gp.push(resourcesRoot);
-  // This makes openclaw's own dependencies (in resources/openclaw/node_modules) resolvable
-  gp.push(require('path').join(resourcesRoot, 'openclaw', 'node_modules'));
-}
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { app, BrowserWindow, nativeImage, session, shell } from 'electron';
 import { join } from 'path';
 import { GatewayManager } from '../gateway/manager';
