@@ -19,15 +19,11 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron/main',
             rollupOptions: {
-              // Externalize most node_modules for electron main process,
-              // BUT bundle openclaw submodules (e.g. openclaw/plugin-sdk)
-              // because openclaw is shipped as extraResources, not in
-              // node_modules — runtime require() can't find it.
+              // Externalize ALL node_modules for electron main process.
+              // The main process runs in Node.js; packages are available at runtime.
               external: (id) => {
                 if (id.startsWith('electron')) return true;
                 if (id.startsWith('node:')) return true;
-                // openclaw submodules must be bundled, not externalized
-                if (id === 'openclaw' || id.startsWith('openclaw/')) return false;
                 if (!id.startsWith('.') && !id.startsWith('/') && !id.includes(':')) return true;
                 return false;
               },
