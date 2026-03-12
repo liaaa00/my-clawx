@@ -27,6 +27,7 @@ import {
   Key,
   ChevronDown,
   FolderOpen,
+  ArrowUpCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -528,7 +529,12 @@ export function Skills() {
     uninstallSkill,
     searching,
     searchError,
-    installing
+    installing,
+    checkUpdates,
+    updateAvailable,
+    updating,
+    updateSkillVersion,
+    updateAllSkills,
   } = useSkillsStore();
   const { t } = useTranslation('skills');
   const gatewayStatus = useGatewayStore((state) => state.status);
@@ -537,7 +543,11 @@ export function Skills() {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [activeTab, setActiveTab] = useState('all');
   const [selectedSource, setSelectedSource] = useState<'all' | 'built-in' | 'marketplace'>('all');
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [updatingAll, setUpdatingAll] = useState(false);
   const marketplaceDiscoveryAttemptedRef = useRef(false);
+
+  const availableUpdatesCount = Object.keys(updateAvailable).length;
 
   const isGatewayRunning = gatewayStatus.state === 'running';
   const [showGatewayWarning, setShowGatewayWarning] = useState(false);
@@ -687,6 +697,47 @@ export function Skills() {
     }
   }, [uninstallSkill, t]);
 
+  // Handle check updates
+  const handleCheckUpdates = useCallback(async () => {
+    setCheckingUpdates(true);
+    try {
+      await checkUpdates();
+      const count = Object.keys(useSkillsStore.getState().updateAvailable).length;
+      if (count === 0) {
+        toast.success(t('toast.noUpdates'));
+      } else {
+        toast.success(t('toast.updatesFound', { count }));
+      }
+    } catch (err) {
+      toast.error(t('toast.failedCheckUpdates') + ': ' + String(err));
+    } finally {
+      setCheckingUpdates(false);
+    }
+  }, [checkUpdates, t]);
+
+  // Handle update all
+  const handleUpdateAll = useCallback(async () => {
+    setUpdatingAll(true);
+    try {
+      await updateAllSkills();
+      toast.success(t('toast.allUpdated'));
+    } catch (err) {
+      toast.error(t('toast.failedUpdate') + ': ' + String(err));
+    } finally {
+      setUpdatingAll(false);
+    }
+  }, [updateAllSkills, t]);
+
+  // Handle update single skill
+  const handleUpdateSkill = useCallback(async (slug: string) => {
+    try {
+      await updateSkillVersion(slug);
+      toast.success(t('toast.updated'));
+    } catch (err) {
+      toast.error(t('toast.failedUpdate') + ': ' + String(err));
+    }
+  }, [updateSkillVersion, t]);
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -710,6 +761,32 @@ export function Skills() {
             <RefreshCw className="h-4 w-4 mr-2" />
             {t('refresh')}
           </Button>
+          <Button
+            variant="outline"
+            onClick={handleCheckUpdates}
+            disabled={!isGatewayRunning || checkingUpdates}
+          >
+            {checkingUpdates ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <ArrowUpCircle className="h-4 w-4 mr-2" />
+            )}
+            {t('checkUpdates')}
+          </Button>
+          {availableUpdatesCount > 0 && (
+            <Button
+              variant="default"
+              onClick={handleUpdateAll}
+              disabled={!isGatewayRunning || updatingAll}
+            >
+              {updatingAll ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {t('updateAll')} ({availableUpdatesCount})
+            </Button>
+          )}
           {hasInstalledSkills && (
             <Button variant="outline" onClick={handleOpenSkillsFolder}>
               <FolderOpen className="h-4 w-4 mr-2" />
@@ -870,6 +947,25 @@ export function Skills() {
                       <Badge variant="outline" className="text-[9px] uppercase tracking-wider py-0 px-1.5 h-4">
                         v{skill.version}
                       </Badge>
+                    )}
+                    {skill.slug && updateAvailable[skill.slug] && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 text-xs text-primary hover:text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (skill.slug) handleUpdateSkill(skill.slug);
+                        }}
+                        disabled={updating[skill.slug]}
+                      >
+                        {updating[skill.slug] ? (
+                          <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <ArrowUpCircle className="h-3 w-3 mr-1" />
+                        )}
+                        {t('update')} v{updateAvailable[skill.slug].latestVersion}
+                      </Button>
                     )}
                     {skill.configurable && (
                       <Badge variant="secondary" className="text-[9px] uppercase tracking-wider py-0 px-1.5 h-4 bg-muted/50">

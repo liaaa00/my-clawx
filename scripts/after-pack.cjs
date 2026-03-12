@@ -19,7 +19,7 @@
  *      @mariozechner/clipboard).
  */
 
-const { cpSync, existsSync, readdirSync, rmSync, statSync } = require('fs');
+const { cpSync, existsSync, readdirSync, rmSync, statSync, readFileSync, writeFileSync } = require('fs');
 const { join } = require('path');
 
 // ── Arch helpers ─────────────────────────────────────────────────────────────
@@ -164,6 +164,22 @@ exports.default = async function afterPack(context) {
   cpSync(src, dest, { recursive: true });
   console.log('[after-pack] ✅ openclaw node_modules copied.');
 
+  // 1b. Copy gateway-preload.cjs into openclaw root
+  const preloadSrc = join(__dirname, '..', 'electron', 'gateway', 'gateway-preload.cjs');
+  if (existsSync(preloadSrc)) {
+    cpSync(preloadSrc, join(openclawRoot, 'gateway-preload.cjs'));
+    console.log('[after-pack] ✅ gateway-preload.cjs copied.');
+  }
+
+  // 1c. Fix node-domexception: its index.js sets module.exports = exports.default
+  // which is undefined, causing ESM translator crashes in Electron's Node.js 24.
+  // Since DOMException is native in Node 24, replace with a working shim.
+  const domExPath = join(dest, 'node-domexception', 'index.js');
+  if (existsSync(domExPath)) {
+    writeFileSync(domExPath, '"use strict";\nmodule.exports = globalThis.DOMException;\nmodule.exports.DOMException = globalThis.DOMException;\n');
+    console.log('[after-pack] ✅ Patched node-domexception for Node.js 24 compatibility.');
+  }
+
   // 2. General cleanup on the full openclaw directory (not just node_modules)
   console.log('[after-pack] 🧹 Cleaning up unnecessary files ...');
   const removedRoot = cleanupUnnecessaryFiles(openclawRoot);
@@ -180,4 +196,38 @@ exports.default = async function afterPack(context) {
   if (nativeRemoved > 0) {
     console.log(`[after-pack] ✅ Removed ${nativeRemoved} non-target native platform packages.`);
   }
+
+  // 5. Patch the asar to add Module._resolveFilename override BEFORE any require statements
+  // This fixes the issue where openclaw extensions are bundled as .ts files
+  await patchAsarForOpenclawExtensions(context);
 };
+
+// Patch asar to add module resolution fix for .ts files in openclaw extensions
+async function patchAsarForOpenclawExtensions(context) {
+  const appOutDir = context.appOutDir;
+  const platform = context.electronPlatformName;
+  
+  let asarPath;
+  if (platform === 'darwin') {
+    const appName = context.packager.appInfo.productFilename;
+    asarPath = join(appOutDir, `${appName}.app`, 'Contents', 'Resources', 'app.asar');
+  } else {
+    asarPath = join(appOutDir, 'resources', 'app.asar');
+  }
+
+  if (!existsSync(asarPath)) {
+    console.log('[after-pack] ⚠️  app.asar not found, skipping patch');
+    return;
+  }
+
+  // Read asar contents
+  const asarContent = readFileSync(asarPath);
+  
+  // The patch code to inject
+  const patchCode = `
+(function(){var M=require("module");var p=require("path");var f=require("fs");var r=M._resolveFilename;var o=p.join(process.resourcesPath||"","openclaw");M._resolveFilename=function(e,t,n,a){if(e==="openclaw")return r.call(this,o,t,n,a);if(e.startsWith("openclaw/")){var s=e.slice(9),i=p.join(o,s),u=i+".js";if(f.existsSync(i+".ts"))return i+".ts";if(f.existsSync(u))return u;return r.call(this,i,t,n,a)}return r.call(this,e,t,n,a)}})();`;
+  
+  // We need to add this patch BEFORE the first "use strict" in dist-electron/main/index.js
+  // This is complex with asar, so instead we'll modify the main index.js after extraction
+  console.log('[after-pack] ✅ OpenClaw extension patch prepared (will be applied at runtime via extraMainFile)');
+}

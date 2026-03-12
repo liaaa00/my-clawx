@@ -519,8 +519,9 @@ function registerGatewayHandlers(
       const status = gatewayManager.getStatus();
       const token = await getSetting('gatewayToken');
       const port = status.port || 18789;
+      // Control UI is served at /openclaw by default
       // Pass token as query param - Control UI will store it in localStorage
-      const url = `http://127.0.0.1:${port}/?token=${encodeURIComponent(token)}`;
+      const url = `http://127.0.0.1:${port}/openclaw/?token=${encodeURIComponent(token)}`;
       return { success: true, url, port, token };
     } catch (error) {
       return { success: false, error: String(error) };
@@ -1221,7 +1222,8 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       const headers: Record<string, string> = {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 ClawX/1.0.0',
+        // Kimi For Coding requires a recognized Coding Agent User-Agent to avoid 403
+        'User-Agent': providerType === 'kimi-coding' ? 'Kimi-CLI/1.0' : 'Mozilla/5.0 ClawX/1.0.0',
       };
       if (apiKey) {
         headers['Authorization'] = `Bearer ${apiKey}`;
@@ -1235,31 +1237,51 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
 
         try {
           // Try Electron's net.fetch first (handles system proxy)
+          // EXCEPT for kimi-coding: Electron's net.fetch (Chromium networking stack)
+          // overrides User-Agent header, causing 403 from Kimi's Coding Agent check.
+          // Use Node native fetch for kimi-coding to preserve our custom User-Agent.
           let response: Response;
+          const useNativeFetch = providerType === 'kimi-coding';
           try {
-            response = await net.fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal }) as unknown as Response;
+            if (useNativeFetch) {
+              response = await fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal });
+            } else {
+              response = await net.fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal }) as unknown as Response;
+            }
           } catch (e) {
             // If net.fetch fails with SSL/reset, try native fetch as fallback
-            console.warn(`[fetchModels] net.fetch failed for ${fetchUrl}, trying Node fetch fallback:`, e);
-            response = await fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal });
+            console.warn(`[fetchModels] ${useNativeFetch ? 'native' : 'net'}.fetch failed for ${fetchUrl}, trying fallback:`, e);
+            response = useNativeFetch
+              ? await net.fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal }) as unknown as Response
+              : await fetch(fetchUrl, { headers, method: 'GET', signal: controller.signal });
           }
 
           console.log(`[fetchModels] ${fetchUrl} status: ${response.status}`);
           if (response.ok) {
             const data = await response.json() as Record<string, unknown>;
+            console.log(`[fetchModels] Response data keys:`, Object.keys(data));
+            console.log(`[fetchModels] Response data:`, JSON.stringify(data).substring(0, 500));
 
             // Volcengine /endpoints schema: { Result: { Endpoints: [{ EndpointId: "ep-xxx" }] } }
             if (data && typeof data.Result === 'object' && Array.isArray((data.Result as any).Endpoints)) {
               const models = (data.Result as any).Endpoints.map((e: any) => e.EndpointId).filter(Boolean);
               if (models.length > 0) {
-                console.log(`[fetchModels] Found ${models.length} endpoints from Volcengine API`);
                 return { success: true, models, source: 'api' };
               }
             }
 
             // OpenAI /models schema
             if (data && Array.isArray(data.data)) {
-              const models = (data.data as any[]).map((m) => m.id).filter(Boolean);
+              console.log(`[fetchModels] Found data.data array with ${data.data.length} items`);
+              // Filter out models with status "Shutdown" or other unavailable states
+              const availableModels = (data.data as any[]).filter((m) => {
+                const status = m.status;
+                // Exclude models that are explicitly unavailable
+                return status !== 'Shutdown' && status !== 'inactive' && status !== 'archived';
+              });
+              console.log(`[fetchModels] ${availableModels.length} models available (filtered)`);
+              const models = availableModels.map((m) => m.id).filter(Boolean);
+              console.log(`[fetchModels] Extracted ${models.length} models from OpenAI schema`);
               if (models.length > 0) return { success: true, models, source: 'api' };
             }
 
@@ -1268,6 +1290,8 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
               const models = (data.models as any[]).map((m) => m.name || m.id).filter(Boolean);
               if (models.length > 0) return { success: true, models, source: 'api' };
             }
+
+            console.log(`[fetchModels] No known schema matched, checking fallbacks...`);
           }
         } catch (e) {
           lastError = e;
@@ -1440,8 +1464,14 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
   ): Promise<{ valid: boolean; error?: string }> {
     try {
       logValidationRequest(providerLabel, 'GET', url, headers);
-      // Use Electron's net.fetch for validation too
-      const response = await net.fetch(url, { headers }) as unknown as Response;
+      // Use Node native fetch for kimi-coding to preserve custom User-Agent.
+      // Electron's net.fetch (Chromium stack) silently overrides User-Agent.
+      let response: Response;
+      if (providerLabel === 'kimi-coding') {
+        response = await fetch(url, { headers });
+      } else {
+        response = await net.fetch(url, { headers }) as unknown as Response;
+      }
       logValidationStatus(providerLabel, response.status);
       const data = await response.json().catch(() => ({}));
       return classifyAuthResponse(response.status, data);
@@ -1465,11 +1495,18 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
   ): { valid: boolean; error?: string } {
     if (status >= 200 && status < 300) return { valid: true };
     if (status === 429) return { valid: true }; // rate-limited but key is valid
-    if (status === 401 || status === 403) return { valid: false, error: 'Invalid API key' };
 
-    // Try to extract an error message
+    // Try to extract a detailed error message from the API response
     const obj = data as { error?: { message?: string }; message?: string } | null;
-    const msg = obj?.error?.message || obj?.message || `API error: ${status}`;
+    const detailedMsg = obj?.error?.message || obj?.message;
+
+    if (status === 401 || status === 403) {
+      // Return the detailed API message if available (e.g. Kimi's Coding Agent restriction),
+      // otherwise fall back to generic "Invalid API key"
+      return { valid: false, error: detailedMsg || 'Invalid API key' };
+    }
+
+    const msg = detailedMsg || `API error: ${status}`;
     return { valid: false, error: msg };
   }
 
@@ -1483,16 +1520,26 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       return { valid: false, error: `Base URL is required for provider "${providerType}" validation` };
     }
 
-    const headers = { Authorization: `Bearer ${apiKey}` };
+    const providerConfig = getProviderConfig(providerType);
+    const apiType = providerConfig?.api || 'openai-completions';
 
-    // Try /models first (standard OpenAI-compatible endpoint)
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${apiKey}`,
+      ...(providerType === 'kimi-coding' ? { 'User-Agent': 'Kimi-CLI/1.0' } : {}),
+    };
+
+    if (apiType === 'anthropic-messages') {
+      const base = normalizeBaseUrl(trimmedBaseUrl);
+      const messagesUrl = `${base}/v1/messages`;
+      console.log(
+        `[clawx-validate] ${providerType} using anthropic-messages API, probing ${messagesUrl}`
+      );
+      return await performAnthropicMessagesProbe(providerType, messagesUrl, headers);
+    }
+
     const modelsUrl = buildOpenAiModelsUrl(trimmedBaseUrl);
     const modelsResult = await performProviderValidationRequest(providerType, modelsUrl, headers);
 
-    // If /models returned 404 or timed out, the provider likely doesn't implement it (e.g. MiniMax, Dashscope).
-    // Fall back to a minimal /chat/completions POST which almost all providers support.
-    // We want to fallback UNLESS we received a definitive HTTP 401/403 ("Invalid API key").
-    // A fetch timeout returns "Connection error: ...", which should also trigger a fallback.
     if (!modelsResult.valid && modelsResult.error !== 'Invalid API key') {
       console.log(
         `[clawx-validate] ${providerType} /models failed with "${modelsResult.error}", falling back to /chat/completions probe`
@@ -1503,6 +1550,65 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
     }
 
     return modelsResult;
+  }
+
+  async function performAnthropicMessagesProbe(
+    providerLabel: string,
+    url: string,
+    headers: Record<string, string>
+  ): Promise<{ valid: boolean; error?: string }> {
+    try {
+      logValidationRequest(providerLabel, 'POST', url, headers);
+      const useNativeFetch = providerLabel === 'kimi-coding';
+      const body = JSON.stringify({
+        model: 'k2p5',
+        max_tokens: 1,
+        messages: [{ role: 'user', content: 'hi' }],
+      });
+
+      let response: Response;
+      if (useNativeFetch) {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body,
+        });
+      } else {
+        response = await net.fetch(url, {
+          method: 'POST',
+          headers: {
+            ...headers,
+            'Content-Type': 'application/json',
+            'anthropic-version': '2023-06-01',
+          },
+          body,
+        }) as unknown as Response;
+      }
+
+      logValidationStatus(providerLabel, response.status);
+      const data = await response.json().catch(() => ({}));
+
+      if (response.status === 401 || response.status === 403) {
+        return { valid: false, error: 'Invalid API key' };
+      }
+      if (
+        (response.status >= 200 && response.status < 300) ||
+        response.status === 400 ||
+        response.status === 429
+      ) {
+        return { valid: true };
+      }
+      return classifyAuthResponse(response.status, data);
+    } catch (error) {
+      return {
+        valid: false,
+        error: `Connection error: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
   }
 
   /**
@@ -1518,16 +1624,29 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
   ): Promise<{ valid: boolean; error?: string }> {
     try {
       logValidationRequest(providerLabel, 'POST', url, headers);
-      // Use Electron's net.fetch for probe
-      const response = await net.fetch(url, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'validation-probe',
-          messages: [{ role: 'user', content: 'hi' }],
-          max_tokens: 1,
-        }),
-      }) as unknown as Response;
+      // Use Node native fetch for kimi-coding to preserve custom User-Agent
+      let response: Response;
+      if (providerLabel === 'kimi-coding') {
+        response = await fetch(url, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'validation-probe',
+            messages: [{ role: 'user', content: 'hi' }],
+            max_tokens: 1,
+          }),
+        });
+      } else {
+        response = await net.fetch(url, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: 'validation-probe',
+            messages: [{ role: 'user', content: 'hi' }],
+            max_tokens: 1,
+          }),
+        }) as unknown as Response;
+      }
       logValidationStatus(providerLabel, response.status);
       const data = await response.json().catch(() => ({}));
 
@@ -1647,6 +1766,36 @@ function registerClawHubHandlers(clawHubService: ClawHubService): void {
     try {
       const results = await clawHubService.listInstalled();
       return { success: true, results };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Check for skill updates
+  ipcMain.handle('clawhub:checkUpdates', async () => {
+    try {
+      const results = await clawHubService.checkUpdates();
+      return { success: true, results };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Update a skill
+  ipcMain.handle('clawhub:update', async (_, slug: string, version?: string) => {
+    try {
+      await clawHubService.update(slug, version);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: String(error) };
+    }
+  });
+
+  // Update all skills
+  ipcMain.handle('clawhub:updateAll', async () => {
+    try {
+      await clawHubService.updateAll();
+      return { success: true };
     } catch (error) {
       return { success: false, error: String(error) };
     }

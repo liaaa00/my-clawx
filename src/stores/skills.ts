@@ -41,6 +41,8 @@ interface SkillsState {
   searching: boolean;
   searchError: string | null;
   installing: Record<string, boolean>; // slug -> boolean
+  updating: Record<string, boolean>; // slug -> boolean
+  updateAvailable: Record<string, { currentVersion: string; latestVersion: string }>; // slug -> update info
   error: string | null;
 
   // Actions
@@ -50,8 +52,11 @@ interface SkillsState {
   uninstallSkill: (slug: string) => Promise<void>;
   enableSkill: (skillId: string) => Promise<void>;
   disableSkill: (skillId: string) => Promise<void>;
+  checkUpdates: () => Promise<void>;
+  updateSkillVersion: (slug: string, version?: string) => Promise<void>;
+  updateAllSkills: () => Promise<void>;
   setSkills: (skills: Skill[]) => void;
-  updateSkill: (skillId: string, updates: Partial<Skill>) => void;
+  updateSkillState: (skillId: string, updates: Partial<Skill>) => void;
 }
 
 export const useSkillsStore = create<SkillsState>((set, get) => ({
@@ -61,6 +66,8 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
   searching: false,
   searchError: null,
   installing: {},
+  updating: {},
+  updateAvailable: {},
   error: null,
 
   fetchSkills: async () => {
@@ -204,8 +211,8 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     }
   },
 
-  enableSkill: async (skillId) => {
-    const { updateSkill } = get();
+enableSkill: async (skillId) => {
+    const { updateSkillState } = get();
 
     try {
       const result = await window.electron.ipcRenderer.invoke(
@@ -215,7 +222,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
       ) as GatewayRpcResponse<unknown>;
 
       if (result.success) {
-        updateSkill(skillId, { enabled: true });
+        updateSkillState(skillId, { enabled: true });
       } else {
         throw new Error(result.error || 'Failed to enable skill');
       }
@@ -226,7 +233,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
   },
 
   disableSkill: async (skillId) => {
-    const { updateSkill, skills } = get();
+    const { updateSkillState, skills } = get();
 
     const skill = skills.find((s) => s.id === skillId);
     if (skill?.isCore) {
@@ -241,7 +248,7 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
       ) as GatewayRpcResponse<unknown>;
 
       if (result.success) {
-        updateSkill(skillId, { enabled: false });
+        updateSkillState(skillId, { enabled: false });
       } else {
         throw new Error(result.error || 'Failed to disable skill');
       }
@@ -251,9 +258,101 @@ export const useSkillsStore = create<SkillsState>((set, get) => ({
     }
   },
 
+  checkUpdates: async () => {
+    try {
+      const result = await window.electron.ipcRenderer.invoke('clawhub:checkUpdates') as {
+        success: boolean;
+        results?: Array<{ slug: string; currentVersion: string; latestVersion: string; updateAvailable: boolean }>;
+        error?: string;
+      };
+
+      if (result.success && result.results) {
+        const updateAvailable: Record<string, { currentVersion: string; latestVersion: string }> = {};
+        for (const item of result.results) {
+          if (item.updateAvailable) {
+            updateAvailable[item.slug] = {
+              currentVersion: item.currentVersion,
+              latestVersion: item.latestVersion,
+            };
+          }
+        }
+        set({ updateAvailable });
+      }
+    } catch (error) {
+      console.error('Failed to check updates:', error);
+    }
+  },
+
+  updateSkillVersion: async (slug: string, version?: string) => {
+    set((state) => ({ updating: { ...state.updating, [slug]: true } }));
+    try {
+      const result = await window.electron.ipcRenderer.invoke('clawhub:update', slug, version) as {
+        success: boolean;
+        error?: string;
+      };
+
+      if (!result.success) {
+        throw new Error(result.error || 'Update failed');
+      }
+
+      // Clear update available for this skill
+      set((state) => {
+        const newUpdateAvailable = { ...state.updateAvailable };
+        delete newUpdateAvailable[slug];
+        return { updateAvailable: newUpdateAvailable };
+      });
+
+      // Refresh skills list
+      await get().fetchSkills();
+    } catch (error) {
+      console.error('Update error:', error);
+      throw error;
+    } finally {
+      set((state) => {
+        const newUpdating = { ...state.updating };
+        delete newUpdating[slug];
+        return { updating: newUpdating };
+      });
+    }
+  },
+
+  updateAllSkills: async () => {
+    const { updateAvailable } = get();
+    const slugs = Object.keys(updateAvailable);
+    if (slugs.length === 0) return;
+
+    set((state) => {
+      const newUpdating: Record<string, boolean> = {};
+      for (const slug of slugs) {
+        newUpdating[slug] = true;
+      }
+      return { updating: { ...state.updating, ...newUpdating } };
+    });
+
+    try {
+      const result = await window.electron.ipcRenderer.invoke('clawhub:updateAll') as {
+        success: boolean;
+        error?: string;
+      };
+
+      if (!result.success) {
+        throw new Error(result.error || 'Update all failed');
+      }
+
+      // Clear all updates and refresh
+      set({ updateAvailable: {} });
+      await get().fetchSkills();
+    } catch (error) {
+      console.error('Update all error:', error);
+      throw error;
+    } finally {
+      set({ updating: {} });
+    }
+  },
+
   setSkills: (skills) => set({ skills }),
 
-  updateSkill: (skillId, updates) => {
+updateSkillState: (skillId: string, updates: Partial<Skill>) => {
     set((state) => ({
       skills: state.skills.map((skill) =>
         skill.id === skillId ? { ...skill, ...updates } : skill

@@ -263,16 +263,19 @@ const REGISTRY: Record<string, ProviderBackendMeta> = {
   },
   'kimi-coding': {
     envVar: 'KIMI_API_KEY',
-    openclawProviderName: 'moonshot-coding',
+    openclawProviderName: 'kimi-coding',
     providerConfig: {
-      baseUrl: 'https://api.kimi.com/coding/v1',
-      api: 'openai-completions',
+      baseUrl: 'https://api.kimi.com/coding/',
+      api: 'anthropic-messages',
       apiKeyEnv: 'KIMI_API_KEY',
-      models: [
-        { id: 'kimi-for-coding', name: 'Kimi for Coding' },
-      ],
     },
-    curatedModels: ['kimi-for-coding'],
+    curatedModels: [
+      'k2p5',
+      'kimi-k2.5',
+      'kimi-k2-thinking',
+      'kimi-v1-a3b',
+      'kimi-latest',
+    ],
   },
   // Additional providers with env var mappings but no default model
   groq: { envVar: 'GROQ_API_KEY' },

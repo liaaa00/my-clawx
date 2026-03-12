@@ -23,6 +23,13 @@ export interface ClawHubUninstallParams {
     slug: string;
 }
 
+export interface ClawHubUpdateResult {
+    slug: string;
+    currentVersion: string;
+    latestVersion: string;
+    updateAvailable: boolean;
+}
+
 export interface ClawHubSkillResult {
     slug: string;
     name: string;
@@ -327,6 +334,79 @@ export class ClawHubService {
             console.error('ClawHub list error:', error);
             return [];
         }
+    }
+
+    /**
+     * Check for skill updates
+     * Returns list of skills with available updates
+     */
+    async checkUpdates(): Promise<ClawHubUpdateResult[]> {
+        try {
+            const installed = await this.listInstalled();
+            if (installed.length === 0) {
+                return [];
+            }
+
+            const results: ClawHubUpdateResult[] = [];
+
+            for (const skill of installed) {
+                try {
+                    // Use inspect to get latest version info
+                    const inspectOutput = await this.runCommand(['inspect', skill.slug, '--json']);
+                    let latestVersion = skill.version;
+
+                    try {
+                        const inspectData = JSON.parse(inspectOutput);
+                        latestVersion = inspectData.version || skill.version;
+                    } catch {
+                        // If JSON parse fails, try to extract version from output
+                        const versionMatch = inspectOutput.match(/"version"\s*:\s*"([^"]+)"/);
+                        if (versionMatch) {
+                            latestVersion = versionMatch[1];
+                        }
+                    }
+
+                    const updateAvailable = latestVersion !== skill.version;
+                    results.push({
+                        slug: skill.slug,
+                        currentVersion: skill.version,
+                        latestVersion,
+                        updateAvailable,
+                    });
+                } catch (err) {
+                    // If inspect fails, assume no update available
+                    results.push({
+                        slug: skill.slug,
+                        currentVersion: skill.version,
+                        latestVersion: skill.version,
+                        updateAvailable: false,
+                    });
+                }
+            }
+
+            return results;
+        } catch (error) {
+            console.error('ClawHub checkUpdates error:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Update a single skill
+     */
+    async update(slug: string, version?: string): Promise<void> {
+        const args = ['update', slug];
+        if (version) {
+            args.push('--version', version);
+        }
+        await this.runCommand(args);
+    }
+
+    /**
+     * Update all installed skills
+     */
+    async updateAll(): Promise<void> {
+        await this.runCommand(['update', '--all']);
     }
 
     /**

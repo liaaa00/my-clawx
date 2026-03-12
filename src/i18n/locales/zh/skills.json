@@ -3,6 +3,9 @@
     "subtitle": "浏览和管理 AI 能力",
     "refresh": "刷新",
     "openFolder": "打开技能文件夹",
+    "checkUpdates": "检查更新",
+    "updateAll": "全部更新",
+    "update": "更新",
     "gatewayWarning": "网关未运行。没有活跃的网关，无法加载技能。",
     "tabs": {
         "installed": "已安装",
@@ -56,8 +59,14 @@
         "failedSave": "保存配置失败",
         "failedOpenFolder": "无法打开技能文件夹",
         "failedInstall": "安装失败",
-        "failedUninstall": "卸载失败",
-        "failedFolderNotFound": "技能文件夹尚不存在，请先安装一个技能。"
+"failedUninstall": "卸载失败",
+        "failedFolderNotFound": "技能文件夹尚不存在，请先安装一个技能。",
+        "noUpdates": "所有技能已是最新版本",
+        "updatesFound": "发现 {{count}} 个可用更新",
+        "allUpdated": "所有技能更新成功",
+        "updated": "技能更新成功",
+        "failedUpdate": "更新失败",
+        "failedCheckUpdates": "检查更新失败"
     },
     "marketplace": {
         "title": "市场",

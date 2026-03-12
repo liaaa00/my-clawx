@@ -362,6 +362,38 @@ echo`   Total discovered: ${collected.size}`;
 echo`   openclaw.mjs: ${entryExists ? '✓' : '✗'}`;
 echo`   dist/entry.js: ${distExists ? '✓' : '✗'}`;
 
+// Add missing exports for extension subpaths
+const pkgJsonPath = path.join(OUTPUT, 'package.json');
+const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf-8'));
+
+const extExports = {};
+const extDir = path.join(OUTPUT, 'extensions');
+if (fs.existsSync(extDir)) {
+  for (const ext of fs.readdirSync(extDir)) {
+    const extPath = path.join(extDir, ext);
+    const stat = fs.lstatSync(extPath);
+    if (stat.isDirectory()) {
+      // Copy .ts files to .js for Node.js compatibility
+      if (fs.existsSync(path.join(extPath, 'oauth.ts'))) {
+        const tsContent = fs.readFileSync(path.join(extPath, 'oauth.ts'), 'utf-8');
+        fs.writeFileSync(path.join(extPath, 'oauth.js'), tsContent);
+        extExports[`./extensions/${ext}/oauth`] = `./extensions/${ext}/oauth.js`;
+      }
+      if (fs.existsSync(path.join(extPath, 'index.ts'))) {
+        const tsContent = fs.readFileSync(path.join(extPath, 'index.ts'), 'utf-8');
+        fs.writeFileSync(path.join(extPath, 'index.js'), tsContent);
+        extExports[`./extensions/${ext}`] = `./extensions/${ext}/index.js`;
+      }
+    }
+  }
+}
+
+if (Object.keys(extExports).length > 0) {
+  pkgJson.exports = { ...pkgJson.exports, ...extExports };
+  fs.writeFileSync(pkgJsonPath, JSON.stringify(pkgJson, null, 2) + '\n');
+  echo`   Added ${Object.keys(extExports).length} extension exports`;
+}
+
 if (!entryExists || !distExists) {
   echo`❌ Bundle verification failed!`;
   process.exit(1);

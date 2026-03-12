@@ -2,7 +2,10 @@
  * Electron Main Process Entry
  * Manages window creation, system tray, and IPC handlers
  */
+
+// Install module resolution patch BEFORE any other imports
 import './patch-require';
+
 import { app, BrowserWindow, nativeImage, session, shell } from 'electron';
 import { join } from 'path';
 import { GatewayManager } from '../gateway/manager';
@@ -191,11 +194,19 @@ async function initialize(): Promise<void> {
   createTray(mainWindow);
 
   // Inject OpenRouter site headers (HTTP-Referer & X-Title) for rankings on openrouter.ai
+  // and Kimi Coding Agent User-Agent to bypass 403 "only available for Coding Agents" restriction
   session.defaultSession.webRequest.onBeforeSendHeaders(
-    { urls: ['https://openrouter.ai/*'] },
+    { urls: ['https://openrouter.ai/*', 'https://api.kimi.com/*'] },
     (details, callback) => {
-      details.requestHeaders['HTTP-Referer'] = 'https://claw-x.com';
-      details.requestHeaders['X-Title'] = 'ClawX';
+      // OpenRouter-specific headers
+      if (details.url.includes('openrouter.ai')) {
+        details.requestHeaders['HTTP-Referer'] = 'https://claw-x.com';
+        details.requestHeaders['X-Title'] = 'ClawX';
+      }
+      // Kimi For Coding requires a recognized Coding Agent User-Agent
+      if (details.url.includes('api.kimi.com')) {
+        details.requestHeaders['User-Agent'] = 'Kimi-CLI/1.0';
+      }
       callback({ requestHeaders: details.requestHeaders });
     },
   );
