@@ -26,11 +26,11 @@ import {
     loginMiniMaxPortalOAuth,
     type MiniMaxOAuthToken,
     type MiniMaxRegion,
-} from 'openclaw/extensions/minimax-portal-auth/oauth';
+} from './oauth-flows';
 import {
     loginQwenPortalOAuth,
     type QwenOAuthToken,
-} from 'openclaw/extensions/qwen-portal-auth/oauth';
+} from './oauth-flows';
 import { saveOAuthTokenToOpenClaw, setOpenClawDefaultModelWithOverride } from './openclaw-auth';
 
 export type OAuthProviderType = 'minimax-portal' | 'qwen-portal';
