@@ -24,7 +24,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile=false
 
       - name: Download UV binaries
         run: pnpm run uv:download:win
@@ -60,7 +60,7 @@ jobs:
         uses: pnpm/action-setup@v4
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile=false
 
       - name: Download UV binaries
         run: pnpm run uv:download:mac
