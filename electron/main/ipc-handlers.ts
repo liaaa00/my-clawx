@@ -89,7 +89,7 @@ export function registerIpcHandlers(
   registerSkillConfigHandlers();
 
   // Cron task handlers (proxy to Gateway RPC)
-  registerCronHandlers(gatewayManager);
+  registerCronHandlers(gatewayManager, mainWindow);
 
   // Window control handlers (for custom title bar on Windows/Linux)
   registerWindowHandlers(mainWindow);
@@ -205,7 +205,11 @@ function transformCronJob(job: GatewayCronJob) {
  * expects CronSchedule objects ({ kind: "cron", expr: "..." }).
  * These handlers bridge the two formats.
  */
-function registerCronHandlers(gatewayManager: GatewayManager): void {
+function registerCronHandlers(gatewayManager: GatewayManager, mainWindow: BrowserWindow): void {
+  const sendCronUpdated = () => {
+    if (!mainWindow.isDestroyed()) mainWindow.webContents.send('cron:updated');
+  };
+
   // List all cron jobs — transforms Gateway CronJob format to frontend CronJob format
   ipcMain.handle('cron:list', async () => {
     try {
@@ -252,8 +256,11 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
       const result = await gatewayManager.rpc('cron.add', gatewayInput);
       // Transform the returned job to frontend format
       if (result && typeof result === 'object') {
-        return transformCronJob(result as GatewayCronJob);
+        const job = transformCronJob(result as GatewayCronJob);
+        sendCronUpdated();
+        return job;
       }
+      sendCronUpdated();
       return result;
     } catch (error) {
       console.error('Failed to create cron job:', error);
@@ -275,6 +282,7 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
         delete patch.message;
       }
       const result = await gatewayManager.rpc('cron.update', { id, patch });
+      sendCronUpdated();
       return result;
     } catch (error) {
       console.error('Failed to update cron job:', error);
@@ -286,6 +294,7 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
   ipcMain.handle('cron:delete', async (_, id: string) => {
     try {
       const result = await gatewayManager.rpc('cron.remove', { id });
+      sendCronUpdated();
       return result;
     } catch (error) {
       console.error('Failed to delete cron job:', error);
@@ -297,6 +306,7 @@ function registerCronHandlers(gatewayManager: GatewayManager): void {
   ipcMain.handle('cron:toggle', async (_, id: string, enabled: boolean) => {
     try {
       const result = await gatewayManager.rpc('cron.update', { id, patch: { enabled } });
+      sendCronUpdated();
       return result;
     } catch (error) {
       console.error('Failed to toggle cron job:', error);
@@ -1188,8 +1198,6 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       apiKey = params.apiKey;
     }
 
-    console.log(`[fetchModels] type=${providerType}, baseUrl=${baseUrl}`);
-
     // Resolve default base URL if not provided
     if (!baseUrl) {
       const defaults: Record<string, string> = {
@@ -1210,6 +1218,12 @@ function registerProviderHandlers(gatewayManager: GatewayManager): void {
       const curated = getCuratedModels(providerType);
       if (curated && curated.length > 0) return { success: true, models: curated, source: 'curated' };
       return { success: false, error: 'No base URL configured and no curated models available' };
+    }
+
+    // kimi-coding does not expose a /models endpoint — skip API probe and use curated list
+    if (providerType === 'kimi-coding') {
+      const curated = getCuratedModels(providerType);
+      if (curated && curated.length > 0) return { success: true, models: curated, source: 'curated' };
     }
 
     try {

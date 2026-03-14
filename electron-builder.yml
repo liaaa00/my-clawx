@@ -5,7 +5,7 @@ compression: maximum
 artifactName: ${productName}-${version}-${os}-${arch}.${ext}
 
 directories:
-  output: release5
+  output: release
   buildResources: resources
 
 files:
