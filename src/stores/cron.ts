@@ -9,7 +9,7 @@ interface CronState {
   jobs: CronJob[];
   loading: boolean;
   error: string | null;
-  
+
   // Actions
   fetchJobs: () => Promise<void>;
   createJob: (input: CronJobCreateInput) => Promise<CronJob>;
@@ -18,9 +18,10 @@ interface CronState {
   toggleJob: (id: string, enabled: boolean) => Promise<void>;
   triggerJob: (id: string) => Promise<void>;
   setJobs: (jobs: CronJob[]) => void;
+  startAutoRefresh: () => () => void;
 }
 
-export const useCronStore = create<CronState>((set) => ({
+export const useCronStore = create<CronState>((set, get) => ({
   jobs: [],
   loading: false,
   error: null,
@@ -105,4 +106,17 @@ export const useCronStore = create<CronState>((set) => ({
   },
   
   setJobs: (jobs) => set({ jobs }),
+
+  startAutoRefresh: () => {
+    // Listen for cron:updated events from main process (triggered by local mutations)
+    const unsubscribe = window.electron.ipcRenderer.on('cron:updated', () => {
+      void get().fetchJobs();
+    });
+    // Also poll every 30s to catch jobs created by OpenClaw directly
+    const interval = setInterval(() => void get().fetchJobs(), 30_000);
+    return () => {
+      unsubscribe?.();
+      clearInterval(interval);
+    };
+  },
 }));

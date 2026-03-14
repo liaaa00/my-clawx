@@ -26,6 +26,19 @@ import { startOpenClawConfigWatcher, stopOpenClawConfigWatcher } from '../utils/
 // Disable GPU acceleration for better compatibility
 app.disableHardwareAcceleration();
 
+// Enforce single instance — if another instance is already running, quit immediately
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 // Global references
 let mainWindow: BrowserWindow | null = null;
 let isQuitting = false;

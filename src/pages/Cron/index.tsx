@@ -427,7 +427,7 @@ function useTemplates() {
 
 export function Cron() {
   const { t } = useTranslation('cron');
-  const { jobs, loading, error, fetchJobs, createJob, updateJob, toggleJob, deleteJob, triggerJob } = useCronStore();
+  const { jobs, loading, error, fetchJobs, createJob, updateJob, toggleJob, deleteJob, triggerJob, startAutoRefresh } = useCronStore();
   const { fetchChannels } = useChannelsStore();
   const gatewayStatus = useGatewayStore((state) => state.status);
   const [showDialog, setShowDialog] = useState(false);
@@ -437,8 +437,12 @@ export function Cron() {
   const isGatewayRunning = gatewayStatus.state === 'running';
 
   useEffect(() => {
-    if (isGatewayRunning) { fetchJobs(); fetchChannels(); }
-  }, [fetchJobs, fetchChannels, isGatewayRunning]);
+    if (isGatewayRunning) {
+      fetchJobs();
+      fetchChannels();
+      return startAutoRefresh();
+    }
+  }, [fetchJobs, fetchChannels, startAutoRefresh, isGatewayRunning]);
 
   const activeJobs = jobs.filter((j) => j.enabled);
   const pausedJobs = jobs.filter((j) => !j.enabled);
