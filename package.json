@@ -1,17 +1,26 @@
 {
     "name": "easy-claw",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "pnpm": {
         "onlyBuiltDependencies": [
+            "@discordjs/opus",
             "@whiskeysockets/baileys",
             "electron",
             "esbuild",
+            "koffi",
             "node-llama-cpp",
             "protobufjs",
             "sharp"
         ],
         "overrides": {
             "isbinaryfile": "^5.0.7"
+        },
+        "peerDependencyRules": {
+            "allowedVersions": {
+                "eslint-plugin-react-hooks>eslint": "*",
+                "prism-media>opusscript": "*",
+                "app-builder-lib>electron-builder-squirrel-windows": "*"
+            }
         }
     },
     "description": "ClawX - Graphical AI Assistant based on OpenClaw",
@@ -22,6 +31,7 @@
     "scripts": {
         "init": "pnpm install && pnpm run uv:download",
         "dev": "vite",
+        "dev:clean": "node -e \"const {execSync}=require('child_process');try{const out=execSync('netstat -ano').toString();const pids=[...new Set(out.split('\\n').filter(l=>l.includes(':18789')&&l.includes('LISTENING')).map(l=>l.trim().split(/\\s+/).pop()).filter(Boolean))];pids.forEach(pid=>{try{execSync('taskkill /F /PID '+pid);console.log('Killed Gateway PID '+pid);}catch(e){}});}catch(e){}\" && vite",
         "build": "vite build && zx scripts/bundle-openclaw.mjs && electron-builder",
         "build:vite": "vite build",
         "lint": "eslint . --fix",
@@ -48,7 +58,7 @@
         "clawhub": "^0.5.0",
         "electron-store": "^11.0.2",
         "electron-updater": "^6.8.3",
-        "openclaw": "2026.3.8",
+        "openclaw": "2026.3.11",
         "ws": "^8.19.0"
     },
     "devDependencies": {

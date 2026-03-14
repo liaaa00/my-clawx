@@ -12,7 +12,7 @@ const OPENCLAW_DIR = join(homedir(), '.openclaw');
 const CONFIG_FILE = join(OPENCLAW_DIR, 'openclaw.json');
 
 // Channels that are managed as plugins (config goes under plugins.entries, not channels)
-const PLUGIN_CHANNELS = ['whatsapp'];
+const PLUGIN_CHANNELS = ['whatsapp', 'feishu', 'matrix', 'line', 'msteams', 'mattermost'];
 
 export interface ChannelConfigData {
     enabled?: boolean;
@@ -214,6 +214,11 @@ export function saveChannelConfig(
  */
 export function getChannelConfig(channelType: string): ChannelConfigData | undefined {
     const config = readOpenClawConfig();
+    
+    if (PLUGIN_CHANNELS.includes(channelType)) {
+        return config.plugins?.entries?.[channelType];
+    }
+    
     return config.channels?.[channelType];
 }
 
@@ -265,6 +270,17 @@ export function getChannelFormValues(channelType: string): Record<string, string
             if (typeof value === 'string' && key !== 'enabled') {
                 values[key] = value;
             }
+        }
+    } else if (channelType === 'feishu') {
+        // Feishu: extract appId and appSecret, handle allowFrom array
+        for (const [key, value] of Object.entries(saved)) {
+            if (typeof value === 'string' && key !== 'enabled') {
+                values[key] = value;
+            }
+        }
+        // allowFrom is array, convert to string for form display
+        if (Array.isArray(saved.allowFrom)) {
+            values.allowFrom = saved.allowFrom.join(', ');
         }
     } else {
         // For other channel types, extract all string values directly

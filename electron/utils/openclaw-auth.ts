@@ -635,12 +635,15 @@ export function getActiveOpenClawProviders(): Set<string> {
 export function syncGatewayTokenToConfig(token: string): void {
   const configPath = join(homedir(), '.openclaw', 'openclaw.json');
   let config: Record<string, unknown> = {};
-  try {
-    if (existsSync(configPath)) {
-      config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+  
+  if (existsSync(configPath)) {
+    try {
+      const raw = readFileSync(configPath, 'utf-8');
+      config = JSON.parse(raw) as Record<string, unknown>;
+    } catch (parseError) {
+      console.error('Failed to parse openclaw.json, preserving existing file:', parseError);
+      throw new Error('Cannot sync gateway token: openclaw.json is corrupt. Please fix or delete the file.');
     }
-  } catch {
-    // start from a blank config if the file is corrupt
   }
 
   const gateway = (
@@ -679,12 +682,15 @@ export function syncGatewayTokenToConfig(token: string): void {
 export function syncBrowserConfigToOpenClaw(): void {
   const configPath = join(homedir(), '.openclaw', 'openclaw.json');
   let config: Record<string, unknown> = {};
-  try {
-    if (existsSync(configPath)) {
-      config = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+  
+  if (existsSync(configPath)) {
+    try {
+      const raw = readFileSync(configPath, 'utf-8');
+      config = JSON.parse(raw) as Record<string, unknown>;
+    } catch (parseError) {
+      console.error('Failed to parse openclaw.json, preserving existing file:', parseError);
+      throw new Error('Cannot sync browser config: openclaw.json is corrupt. Please fix or delete the file.');
     }
-  } catch {
-    // start from a blank config if the file is corrupt
   }
 
   const browser = (
